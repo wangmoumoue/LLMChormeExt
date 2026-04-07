@@ -92,14 +92,13 @@ The LlamB plugin system provides a secure, sandboxed environment for extending f
 ## Plugin Structure
 
 ### Directory Layout
-```
+```text
 plugins/
-└── plugin-name/
-    ├── plugin.js          # Main plugin implementation
-    ├── manifest.json      # Plugin configuration
-    ├── README.md         # Plugin documentation (optional)
-    └── assets/           # Icons, images, etc. (optional)
-        └── icon.svg
++-- plugin-name/
+    +-- plugin.js          # Main plugin implementation
+    +-- manifest.json      # Plugin configuration
+    +-- assets/            # Icons, images, etc. (optional)
+        +-- icon.svg
 ```
 
 ### Manifest.json Schema
@@ -288,10 +287,9 @@ class GithubRepositoryPlugin extends LlambPluginBase {
 
   async getContent() {
     const repoInfo = this.extractRepositoryInfo();
-    const readme = await this.extractReadme();
-    
+
     return this.formatContentForChat(
-      `# ${repoInfo.name}\n\n${repoInfo.description}\n\n${readme}`,
+      `# ${repoInfo.name}\n\n${repoInfo.description}`,
       {
         title: `GitHub Repository: ${repoInfo.name}`,
         type: 'repository'
@@ -303,7 +301,7 @@ class GithubRepositoryPlugin extends LlambPluginBase {
     return {
       icon: `<svg><!-- GitHub icon --></svg>`,
       text: 'Repository Info',
-      description: 'Extract GitHub repository information and README'
+      description: 'Extract GitHub repository information'
     };
   }
 
@@ -312,11 +310,6 @@ class GithubRepositoryPlugin extends LlambPluginBase {
     const description = document.querySelector('p[itemprop="about"]')?.textContent?.trim();
     
     return { name, description };
-  }
-
-  async extractReadme() {
-    const readmeElement = document.querySelector('#readme');
-    return readmeElement ? readmeElement.textContent : '';
   }
 }
 
@@ -546,9 +539,8 @@ To contribute a plugin to the main LlamB extension:
 
 1. **Follow this development guide**
 2. **Test thoroughly** on target websites
-3. **Document your plugin** with clear README
+3. **Document your plugin** clearly in your project materials
 4. **Submit a pull request** with plugin files and tests
-5. **Provide examples** of extracted content
 
 ## Support
 

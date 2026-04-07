@@ -1,255 +1,329 @@
-# 🦙 LlamB Browser Extension
+# LLaMb Chrome Extension
 
-A Chrome extension that provides an AI chat sidebar for any webpage, allowing you to interact with LLMs while having full context of the current page.
+`LLaMb Chrome Extension` 是一个基于 Chrome Manifest V3 的浏览器扩展，用来在任意网页侧边打开 AI 对话面板，并把当前页面的标题、URL、选中文本、页面内容以及插件提取到的附加信息一起发给大模型。
 
-![CleanShot 2025-09-02 at 21 17 55@2x](https://github.com/user-attachments/assets/e92982d6-1153-4a44-b569-962e20a46bce)
+这个项目的核心目标不是做一个独立网页应用，而是把 AI 助手直接嵌入到浏览过程里，让你在阅读网页、看视频、查资料时，随时结合当前页面上下文进行提问、总结、解释和分析。
 
+## 项目能做什么
 
-https://www.youtube.com/watch?v=C13dLtJSsV8
+- 在任意网页注入聊天侧边栏
+- 自动采集当前网页上下文
+- 支持选中文本后直接结合选区提问
+- 支持多个 LLM 连接配置，并可切换当前激活模型
+- 支持流式输出
+- 保存聊天历史，并按会话恢复
+- 支持快捷动作，快速发起“总结页面”“解释选中文本”等固定提示
+- 支持插件机制，为特定网站提取额外内容
+- 当前内置 `YouTube Captions` 插件，可提取 YouTube 视频字幕作为上下文
 
-## Features
+## 如何运行
 
-- **Chat Sidebar**: Floating sidebar that appears on any webpage
-- **Page Context Awareness**: AI has access to current page URL, title, and selected text
-- **Multiple LLM Providers**: Support for OpenAI, Anthropic, Google, Ollama, and OpenRouter
-- **Plugin System**: Extensible architecture with YouTube captions plugin
-- **Chat History**: Persistent conversation management across sessions
-- **Modern UI**: Clean, responsive design with light/dark theme support
-- **Context Chips**: Smart page metadata extraction and display
-- **Quick Actions**: Analyze pages, summarize selected text, and more
+这个项目是原生 Chrome 扩展项目，没有 `npm install`、没有打包脚本、也没有前端构建流程。运行方式就是直接以“开发者模式”加载源码目录。
 
-## Technical Architecture
+### 运行步骤
 
-### Sidebar Injection
-The extension injects a chat sidebar directly into the DOM of any webpage using a content script. The sidebar is created dynamically via JavaScript and styled with CSS to appear as a floating overlay that doesn't interfere with the page layout. This approach ensures compatibility with all websites while maintaining full functionality.
+1. 打开 Chrome，进入 `chrome://extensions/`
+2. 打开右上角的“开发者模式”
+3. 点击“加载已解压的扩展程序”
+4. 选择当前项目根目录，也就是包含 [manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/manifest.json) 的目录
+5. 加载成功后，浏览器工具栏会出现扩展图标
 
-### CORS Avoidance
-The extension avoids Cross-Origin Resource Sharing (CORS) issues by using a smart architecture:
+### 首次使用前要做的事
 
-- **Content Script**: Runs in the webpage context and handles UI interactions
-- **Background Service Worker**: Acts as a proxy for API calls to LLM providers
-- **Message Passing**: Chrome's extension messaging API facilitates secure communication between content script and background worker
+1. 点击扩展图标，打开弹窗界面
+2. 进入设置页，添加至少一个 LLM 连接
+3. 填写模型接口地址、模型名和 API Key
+4. 将某个连接设为激活状态
+5. 返回任意网页，点击扩展图标或右键菜单，打开侧边栏开始聊天
 
-When you send a message to an AI, the content script forwards it to the background worker, which makes the actual API call to OpenAI, Anthropic, or other providers. The response is then streamed back to the content script and displayed in the sidebar. This design completely bypasses CORS restrictions since the API calls originate from the extension's background context, not the webpage.
+## 如何使用
 
-### Plugin System
-The extension features a modular plugin architecture that allows for site-specific functionality:
+### 1. 打开侧边栏
 
-- **Base Plugin Class**: Provides common functionality and API access
-- **Dynamic Loading**: Plugins are loaded via manifest content scripts to comply with Chrome's CSP
-- **Context Chips**: Plugins can display contextual information as interactive chips in the sidebar
-- **Site Detection**: Plugins automatically activate based on current webpage domain
+有几种入口：
 
-## Installation
+- 点击浏览器工具栏中的扩展图标
+- 使用右键菜单中的 `Toggle Chat Sidebar`
+- 由弹窗中的按钮触发
 
-### Before Publishing - Important Configuration
+侧边栏支持两种显示方式：
 
-**Before open-sourcing or publishing this extension, make sure to:**
+- 贴边侧栏模式
+- 浮动窗口模式
 
-1. **Update GitHub URLs**: Replace `YOUR_USERNAME` with your actual GitHub username in `popup.js`
-2. **Review API Keys**: Ensure no API keys or sensitive data are hardcoded
-3. **Test All Features**: Verify the extension works correctly after the bug fixes
+浮动窗口的位置和尺寸会被记录，下次打开时会恢复。
 
-### Debug Logging
+### 2. 结合当前网页聊天
 
-The extension now includes a user-configurable debug logging feature:
-- **Default**: Debug logging is **disabled** by default for clean console output
-- **Enable/Disable**: Toggle debug logging in Settings → Global Settings → "Enable debug logging (console)"
-- **No code changes needed**: The setting controls all console logging dynamically
-- **Production ready**: No need to modify any code before publishing
+在网页中打开侧边栏后，发送消息时扩展会自动整理当前页面信息，通常包括：
 
-### Load as Unpacked Extension (Development)
+- 页面标题
+- 页面 URL
+- 当前选中文本
+- 页面提取出的正文内容
+- 插件提取到的附加内容，例如 YouTube 字幕
 
-1. **Download or Clone** this repository to your local machine
-2. **Open Chrome** and navigate to `chrome://extensions/`
-3. **Enable Developer Mode** by toggling the switch in the top right corner
-4. **Click "Load unpacked"** and select the project folder (`LlambBrowserExt`)
+这些内容会被拼成系统上下文，再和你的问题一起发送给当前激活的 LLM。
 
+### 3. 使用快捷动作
 
-## Usage
+项目内置了一组快捷动作，例如：
 
-### Basic Usage
+- 总结当前页面
+- 解释当前选中文本
+- 概述页面主题
+- 提炼关键信息
 
-1. **Toggle Sidebar**: Click the extension icon in the toolbar or use the floating toggle button
-2. **Chat**: Type messages in the chat input at the bottom of the sidebar
-3. **Page Context**: The AI automatically knows what page you're on and can access selected text
+快捷动作本质上是带变量占位符的 Prompt 模板，会自动填入页面标题、URL、正文和选区内容，然后直接把请求发到侧边栏里。
 
-### Quick Actions (via Popup)
+### 4. 管理连接
 
-1. **Click the extension icon** to open the popup
-2. **Toggle Chat Sidebar**: Open/close the sidebar
-3. **Analyze Current Page**: Get AI insights about the current webpage
-4. **Summarize Selection**: Summarize any text you've selected on the page
+设置页支持：
 
-### Settings
+- 新增连接
+- 编辑连接
+- 删除连接
+- 测试连接
+- 设为当前激活连接
+- 配置是否启用流式输出、推理能力等特性
 
-- **AI Model**: Choose between different AI models (GPT-3.5, GPT-4, Claude, etc.)
-- **API Key**: Configure your API key for LLM access
-- Access settings through the extension popup
+连接信息保存在本地 `chrome.storage.local` 中。
 
-## File Structure
+### 5. 管理插件
 
+目前项目内置一个插件：
+
+- `YouTube Captions`
+
+启用后，当你访问 YouTube 视频页面时，插件会尝试提取字幕内容，并把它作为额外上下文提供给聊天系统。这样你可以直接基于视频字幕提问、总结和分析。
+
+## 这个项目是怎么运作的
+
+整个扩展可以理解成 4 层：
+
+1. 页面层：采集上下文并渲染聊天 UI
+2. 后台层：统一处理消息、管理 LLM 请求、转发流式响应
+3. 配置层：管理连接、设置、快捷动作和会话数据
+4. 插件层：为特定网站补充额外内容
+
+### 页面层：`content.js`
+
+[content.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 是注入到网页中的主内容脚本，负责：
+
+- 创建和销毁侧边栏 UI
+- 管理侧边栏显示状态
+- 支持浮动窗口拖拽和缩放
+- 读取用户选区和页面内容
+- 加载聊天历史并渲染消息
+- 接收后台返回的流式内容并实时更新界面
+- 协调插件，把插件提取的内容加入页面上下文
+
+当用户在侧边栏里发送消息时，`content.js` 会先调用本地的页面上下文提取逻辑，再通过 `chrome.runtime.sendMessage` 把消息发给后台。
+
+### 后台层：`background.js`
+
+[background.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js) 是扩展的 Service Worker，负责：
+
+- 在安装和启动时初始化管理器
+- 创建右键菜单
+- 处理来自内容脚本、弹窗和设置页的消息
+- 管理和调用 LLM
+- 把流式输出按块转发回页面
+- 提供聊天历史、连接列表、插件列表等后台能力
+
+你可以把它理解成整个扩展的调度中心。
+
+### 配置与数据层：`js/`
+
+`js/` 目录下是扩展的核心逻辑模块。
+
+#### [js/storage-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/storage-manager.js)
+
+负责统一管理设置数据，包括：
+
+- LLM 连接
+- 当前激活连接
+- 全局设置
+- 快捷动作
+- 侧边栏显示状态
+- 当前激活会话
+
+#### [js/chat-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/chat-manager.js)
+
+负责聊天持久化，包括：
+
+- 创建会话
+- 保存消息
+- 维护聊天标题
+- 查询历史记录
+- 删除会话
+- 导出 Markdown
+
+#### [js/llm-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-manager.js)
+
+这是 LLM 调度核心，负责：
+
+- 获取当前激活连接
+- 构造消息数组
+- 把页面上下文包装成系统提示
+- 调用具体 Provider
+- 处理流式和非流式响应
+- 在多个连接之间做失败回退
+
+#### [js/llm-providers.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-providers.js)
+
+负责适配不同模型服务接口。当前代码主要覆盖：
+
+- OpenAI
+- OpenAI Compatible
+- Anthropic
+
+每个 Provider 会根据不同平台的 API 规范组装请求。
+
+#### [js/stream-parser.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/stream-parser.js)
+
+负责解析流式返回的数据块，把 SSE 或完整响应整理成可用于 UI 渲染的内容片段。
+
+#### [js/plugin-base.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/plugin-base.js)
+
+定义插件统一接口和公共能力，是所有插件的基类。
+
+#### [js/plugin-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/plugin-manager.js)
+
+负责：
+
+- 注册插件
+- 启用或停用插件
+- 给插件分配受控 API
+- 在页面变化时通知插件
+- 从插件取回内容并作为上下文注入聊天
+
+### 弹窗层：`popup.html` / `popup.js`
+
+[popup.html](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.html) 和 [popup.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.js) 是点击扩展图标后看到的界面，主要承担轻量操作入口：
+
+- 切换侧边栏
+- 查看和切换连接
+- 执行快捷动作
+- 查看插件状态
+- 跳转到设置页
+
+适合日常快速使用。
+
+### 设置页：`settings.html` / `settings.js`
+
+[settings.html](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.html) 和 [settings.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.js) 是完整配置页，主要用于：
+
+- 管理 LLM 连接
+- 编辑全局设置
+- 开关流式输出
+- 导入和导出设置
+- 管理插件启用状态
+
+适合做完整配置和维护。
+
+### 插件层：`plugins/`
+
+当前插件目录里已有一个内置插件：
+
+- [plugins/youtube-captions/plugin.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/plugins/youtube-captions/plugin.js)
+- [plugins/youtube-captions/manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/plugins/youtube-captions/manifest.json)
+
+它的作用是在 YouTube 视频页中提取字幕，并把结果暴露给侧边栏作为额外上下文。
+
+## 一次完整请求的执行流程
+
+下面是一条消息从输入到返回的大致路径：
+
+1. 用户在网页中打开侧边栏并输入问题
+2. [content.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 提取页面标题、URL、选区、页面正文和插件内容
+3. 内容脚本把消息发给 [background.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js)
+4. 后台调用 [js/llm-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-manager.js)
+5. `LLMManager` 根据当前激活连接选择对应 Provider
+6. Provider 请求外部模型 API
+7. 如果是流式响应，后台会把每个数据块持续转发回内容脚本
+8. 内容脚本实时更新侧边栏消息 UI
+9. 聊天记录由 `ChatManager` 持久化保存
+
+## 项目结构
+
+```text
+LLaMbChromeExt/
++-- manifest.json               # Chrome 扩展入口配置
++-- background.js              # 后台 Service Worker
++-- content.js                 # 页面侧边栏与上下文采集主逻辑
++-- popup.html                 # 扩展弹窗页面
++-- popup.js                   # 弹窗交互逻辑
++-- settings.html              # 设置页面
++-- settings.js                # 设置页逻辑
++-- sidebar.css                # 页面侧边栏样式
++-- llamb-ui.css               # popup / settings 通用 UI 样式
++-- js/
+    +-- storage-manager.js     # 设置、连接、快捷动作、状态存储
+    +-- chat-manager.js        # 聊天历史管理
+    +-- llm-manager.js         # LLM 请求编排
+    +-- llm-providers.js       # 多 Provider 适配
+    +-- stream-parser.js       # 流式结果解析
+    +-- plugin-base.js         # 插件基类
+    +-- plugin-manager.js      # 插件管理器
+    +-- debug-logger.js        # 调试日志控制
++-- plugins/
+    +-- youtube-captions/
+        +-- manifest.json      # 插件元信息
+        +-- plugin.js          # YouTube 字幕提取插件
++-- icons/                     # 扩展图标资源
++-- DESIGN_SYSTEM.md           # 界面设计说明
++-- PLUGIN_DEVELOPMENT.md      # 插件开发文档
 ```
-LlambBrowserExt/
-├── manifest.json              # Extension configuration
-├── content.js                # Content script (injected into web pages)
-├── sidebar.css               # Sidebar styling  
-├── background.js             # Background service worker
-├── popup.html               # Extension popup interface
-├── popup.js                 # Popup functionality
-├── settings.html            # Settings page interface
-├── settings.js              # Settings page functionality
-├── create_icons.html        # Icon generator utility
-├── js/                      # Core modules
-│   ├── storage-manager.js   # Local storage management
-│   ├── chat-manager.js      # Chat persistence and management
-│   ├── llm-manager.js       # LLM provider integration
-│   ├── llm-providers.js     # Individual provider implementations
-│   ├── stream-parser.js     # Response streaming utilities
-│   ├── plugin-manager.js    # Plugin system management
-│   └── plugin-base.js       # Base plugin class
-├── plugins/                 # Plugin directory
-│   └── youtube-captions/    # YouTube captions plugin
-│       ├── plugin.js        # Plugin implementation
-│       └── manifest.json    # Plugin metadata
-├── icons/                   # Extension icons
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-├── DESIGN_SYSTEM.md        # UI design guidelines
-├── PLUGIN_DEVELOPMENT.md   # Plugin development guide
-└── README.md              # This file
-```
 
-## Current Status
+## 支持的配置与能力
 
-✅ **Core Extension Complete**
-- Chrome extension manifest and permissions
-- Content script injection system with DOM sidebar creation
-- Background service worker for API proxying (CORS avoidance)
-- Modern UI with light/dark theme support
-- Popup and settings interfaces
+### 连接配置
 
-✅ **LLM Integration Complete**
-- Multiple provider support (OpenAI, Anthropic, Google, Ollama, OpenRouter)
-- Real-time streaming responses
-- Connection management and API key handling
-- Error handling and retry logic
+连接对象通常包含：
 
-✅ **Plugin System Complete**
-- Extensible plugin architecture
-- YouTube captions extraction plugin
-- Context chip system for metadata display
-- Dynamic plugin loading with CSP compliance
+- 连接名称
+- Provider 类型
+- Endpoint
+- API Key
+- 模型名
+- 是否启用
+- 优先级
+- 是否支持流式输出
 
-✅ **Chat Management Complete**
-- Persistent chat history
-- Session management across tabs
-- Context preservation and restoration
+### 全局设置
 
-## Plugin Development
+当前代码中可见的全局设置包括：
 
-The extension supports a modular plugin system that allows developers to create site-specific integrations. The YouTube captions plugin serves as a reference implementation.
+- 主题
+- 自动采集上下文
+- 流式输出开关
+- 是否展示 thinking blocks
+- 最大 token 数
+- temperature
+- 调试日志开关
 
-### Creating a Plugin
-1. Create a new directory under `plugins/your-plugin-name/`
-2. Implement your plugin class extending `LlambPluginBase`
-3. Add a `manifest.json` file with plugin metadata
-4. Register your plugin in the main manifest.json
+## 适合继续扩展的方向
 
-For detailed documentation on creating plugins, see [PLUGIN_DEVELOPMENT.md](PLUGIN_DEVELOPMENT.md).
+这个项目已经具备继续演进的基础，比较容易扩展的方向有：
 
-### Available Plugins
-- **YouTube Captions**: Extracts and displays video captions as context chips for YouTube videos
+- 增加更多模型 Provider
+- 增加更多站点插件
+- 改进页面正文抽取质量
+- 增强快捷动作模板系统
+- 完善聊天导出与导入
+- 为插件增加更完整的设置界面
 
-## Next Steps
+## 开发提示
 
-1. **Enhanced Context**: OCR for images, PDF reading, webpage text extraction
-2. **More Plugins**: Additional site-specific integrations (GitHub, Stack Overflow, etc.)
-3. **Customization**: Sidebar positioning, keyboard shortcuts, custom themes
-4. **Export/Import**: Conversation export, settings backup/restore
-5. **Advanced Features**: Voice input, image analysis, code execution
+- 修改源码后，需要回到 `chrome://extensions/` 点击刷新扩展
+- 内容脚本调试看网页 DevTools
+- 后台逻辑调试看扩展的 Service Worker 控制台
+- Popup 调试可以右键扩展弹窗进行检查
+- 设置页就是普通扩展页面，可直接打开 DevTools
 
-## Development
+## 备注
 
-### Prerequisites
-- Chrome browser (Manifest V3 compatible)
-- Basic knowledge of JavaScript, HTML, CSS
-- API keys for your chosen LLM provider
-- Understanding of Chrome extension architecture
-
-### Making Changes
-1. Edit the source files
-2. Go to `chrome://extensions/`
-3. Click the refresh icon on your extension
-4. Test your changes on various websites
-
-### Recent Technical Improvements
-The extension has been enhanced to handle Chrome's strict Content Security Policy (CSP) and context isolation:
-
-- **CSP Compliance**: Plugin scripts are loaded via manifest content_scripts to avoid CSP eval errors
-- **Context Isolation**: Proper handling of Chrome's isolated execution contexts between content scripts and webpage
-- **Dynamic Loading**: Scripts are loaded dynamically with proper error handling and timing
-- **Plugin Architecture**: Modular system that works within Chrome's security constraints
-
-### Debugging
-- **Content Script**: Use the webpage's developer console
-- **Background Script**: Use the extension's service worker console in `chrome://extensions/`
-- **Popup**: Right-click the extension icon and select "Inspect popup"
-- **Plugin Issues**: Check console for plugin loading errors and context isolation problems
-
-## Permissions Explained
-
-- `activeTab`: Access the current webpage for context
-- `storage`: Save user settings and preferences
-- `scripting`: Inject the sidebar into web pages
-- `<all_urls>`: Work on all websites
-
-## Recent Updates & Bug Fixes (v1.0.1)
-
-### New Features
-- **User-Configurable Debug Logging**: Added toggle in settings to control console logging (defaults to OFF)
-  - No more verbose console output by default
-  - Enable/disable debug logs without code changes
-  - Accessible via Settings → Global Settings
-
-### Bug Fixes (v1.0.0)
-- **Fixed missing file references**: Removed non-existent `sidebar.html` and `sidebar.js` from manifest
-- **Fixed undefined DOM elements**: Resolved popup.js errors with missing connectionSelect and connectionStatus
-- **Updated placeholder URLs**: GitHub repository links now use configurable placeholders
-- **Improved error handling**: Added robust error handling for script loading with timeouts
-- **Enhanced storage migration**: Safer migration that doesn't clear all user data
-- **Fixed icon filename**: Renamed incorrectly named icon file
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Troubleshooting
-
-**Sidebar not appearing?**
-- Try refreshing the webpage
-- Check if the extension is enabled in `chrome://extensions/`
-
-**Extension icon not visible?**
-- Make sure you've added the icon files to the `icons/` folder
-- Refresh the extension in `chrome://extensions/`
-
-**Chat not working?**
-- LLM integration is still in development
-- Currently shows placeholder responses for testing UI functionality
-
-## Support
-
-For issues, feature requests, or questions:
-- Open an issue on GitHub
-- Check the troubleshooting section above
-- Review the Chrome extension developer documentation
+- 本项目当前是本地配置模式，敏感信息保存在浏览器扩展存储中
+- 连接测试逻辑默认会请求你配置的接口地址，确保接口支持对应 API 格式
+- 插件加载方式受 Manifest V3 CSP 限制，新插件需要在 [manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/manifest.json) 中预先声明相关脚本资源
