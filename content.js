@@ -158,6 +158,46 @@
     }) || null;
   }
 
+  function isTopOverlayCandidate(element) {
+    if (!(element instanceof Element) || element.id === ROOT_ID || element.id === SLOT_ID) {
+      return false;
+    }
+
+    const styles = window.getComputedStyle(element);
+    if (!['fixed', 'sticky'].includes(styles.position)) {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width < Math.min(window.innerWidth * 0.35, 320) || rect.height < 28) {
+      return false;
+    }
+
+    if (rect.top > 24 || rect.bottom < 24) {
+      return false;
+    }
+
+    if (styles.visibility === 'hidden' || styles.display === 'none' || Number(styles.opacity) === 0) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function getTopOverlayMetrics() {
+    const elements = Array.from(document.body.querySelectorAll('*')).filter(isTopOverlayCandidate);
+    const overlays = elements
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .sort((a, b) => a.rect.bottom - b.rect.bottom);
+
+    const bottom = overlays.reduce((maxBottom, item) => Math.max(maxBottom, item.rect.bottom), 0);
+
+    return {
+      overlays: overlays.map((item) => item.element),
+      overlayBottom: bottom
+    };
+  }
+
   function getStyleProfile(container) {
     const baseElement = container || document.body || document.documentElement;
     const headingElement = pickFirstVisible([
@@ -186,6 +226,15 @@
     const paragraphStyles = window.getComputedStyle(paragraphElement || baseElement);
     const actionStyles = window.getComputedStyle(actionElement || baseElement);
     const rootStyles = window.getComputedStyle(document.documentElement);
+    const panelElement = pickFirstVisible([
+      container?.querySelector('section'),
+      container?.querySelector('aside'),
+      container?.querySelector('div'),
+      document.querySelector('section'),
+      document.querySelector('aside'),
+      document.querySelector('div')
+    ]);
+    const panelStyles = window.getComputedStyle(panelElement || baseElement);
 
     return {
       fontFamily: paragraphStyles.fontFamily || baseStyles.fontFamily || rootStyles.fontFamily,
@@ -194,14 +243,26 @@
       headingColor: headingStyles.color || paragraphStyles.color || '#111111',
       accentColor: actionStyles.color || headingStyles.color || paragraphStyles.color || '#1a73e8',
       backgroundColor: baseStyles.backgroundColor || 'transparent',
-      surfaceColor: rootStyles.backgroundColor && rootStyles.backgroundColor !== 'rgba(0, 0, 0, 0)'
-        ? rootStyles.backgroundColor
-        : '#ffffff',
-      borderColor: actionStyles.borderColor && actionStyles.borderColor !== 'rgba(0, 0, 0, 0)'
-        ? actionStyles.borderColor
+      surfaceColor: panelStyles.backgroundColor && panelStyles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+        ? panelStyles.backgroundColor
+        : rootStyles.backgroundColor && rootStyles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+          ? rootStyles.backgroundColor
+          : '#ffffff',
+      borderColor: panelStyles.borderColor && panelStyles.borderColor !== 'rgba(0, 0, 0, 0)'
+        ? panelStyles.borderColor
+        : actionStyles.borderColor && actionStyles.borderColor !== 'rgba(0, 0, 0, 0)'
+          ? actionStyles.borderColor
+          : 'rgba(0, 0, 0, 0.16)',
+      softAccentColor: actionStyles.backgroundColor && actionStyles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+        ? actionStyles.backgroundColor
         : 'rgba(0, 0, 0, 0.16)',
-      radius: actionStyles.borderRadius && actionStyles.borderRadius !== '0px'
-        ? actionStyles.borderRadius
+      radius: panelStyles.borderRadius && panelStyles.borderRadius !== '0px'
+        ? panelStyles.borderRadius
+        : actionStyles.borderRadius && actionStyles.borderRadius !== '0px'
+          ? actionStyles.borderRadius
+          : '12px',
+      shadow: panelStyles.boxShadow && panelStyles.boxShadow !== 'none'
+        ? panelStyles.boxShadow
         : '12px',
       headingSize: headingStyles.fontSize || '1.5rem',
       bodySize: paragraphStyles.fontSize || baseStyles.fontSize || '1rem',
@@ -219,11 +280,51 @@
     root.style.setProperty('--llamb-background-color', profile.backgroundColor);
     root.style.setProperty('--llamb-surface-color', profile.surfaceColor);
     root.style.setProperty('--llamb-border-color', profile.borderColor);
+    root.style.setProperty('--llamb-soft-accent-color', profile.softAccentColor);
     root.style.setProperty('--llamb-radius', profile.radius);
+    root.style.setProperty('--llamb-shadow', profile.shadow);
     root.style.setProperty('--llamb-heading-size', profile.headingSize);
     root.style.setProperty('--llamb-body-size', profile.bodySize);
     root.style.setProperty('--llamb-line-height', profile.lineHeight);
     root.style.setProperty('--llamb-action-weight', profile.actionWeight);
+  }
+
+  function getFaviconUrl() {
+    const iconSelectors = [
+      'link[rel="icon"]',
+      'link[rel="shortcut icon"]',
+      'link[rel="apple-touch-icon"]',
+      'link[rel*="icon"]'
+    ];
+
+    for (const selector of iconSelectors) {
+      const link = document.querySelector(selector);
+      const href = link?.getAttribute('href');
+      if (!href) {
+        continue;
+      }
+
+      try {
+        return new URL(href, window.location.href).href;
+      } catch {
+        continue;
+      }
+    }
+
+    try {
+      return new URL('/favicon.ico', window.location.origin).href;
+    } catch {
+      return '';
+    }
+  }
+
+  function buildHostIconMarkup() {
+    const faviconUrl = getFaviconUrl();
+    if (!faviconUrl) {
+      return '';
+    }
+
+    return `<span class="llamb-analysis-host-icon" aria-hidden="true"><img src="${escapeHtml(faviconUrl)}" alt=""></span>`;
   }
 
   function describePlacement(anchorSpec) {
@@ -301,12 +402,16 @@
     const styleProfile = getStyleProfile(primaryContainer);
     const anchors = collectAnchors(primaryContainer);
     const pageProfile = cachedPageProfile || getPageProfile();
+    const overlayMetrics = getTopOverlayMetrics();
     return {
       hostStyle: styleProfile,
       behavior: {
         pageType: pageProfile.isDynamicFeed ? 'dynamic-feed' : 'static-document',
         avoidZones: pageProfile.isDynamicFeed ? ['feed-stream', 'visual-bottom'] : ['visual-bottom'],
-        placementPolicy: pageProfile.isDynamicFeed ? 'stable-anchor-only' : 'flow-or-anchor'
+        placementPolicy: pageProfile.isDynamicFeed ? 'middle-gap-or-stable-anchor' : 'flow-or-anchor',
+        preferredPlacement: pageProfile.isDynamicFeed ? 'middle' : 'top',
+        hasFloatingHeader: overlayMetrics.overlayBottom > 0,
+        topOverlayHeight: Math.round(overlayMetrics.overlayBottom)
       },
       structure: {
         primaryTag: primaryContainer?.tagName?.toLowerCase() || 'body',
@@ -333,22 +438,22 @@
     const pageProfile = cachedPageProfile || getPageProfile();
     if (!placement) {
       return {
-        mode: pageProfile.isDynamicFeed ? 'anchor' : 'flow',
-        position: 'top'
+        mode: 'flow',
+        position: pageProfile.isDynamicFeed ? 'middle' : 'top'
       };
     }
 
     if (typeof placement === 'string') {
       return {
-        mode: pageProfile.isDynamicFeed ? 'anchor' : 'flow',
-        position: 'top'
+        mode: 'flow',
+        position: pageProfile.isDynamicFeed ? 'middle' : 'top'
       };
     }
 
     const normalizedPosition = String(placement.position || placement.preference || 'top').toLowerCase();
     const normalizedMode = String(placement.mode || 'flow').toLowerCase();
     return {
-      mode: pageProfile.isDynamicFeed && normalizedMode === 'flow' ? 'anchor' : normalizedMode,
+      mode: normalizedMode,
       position: normalizedPosition === 'bottom' || normalizedPosition === 'end' ? 'middle' : normalizedPosition,
       anchorId: placement.anchorId || placement.anchor || '',
       label: placement.label || '',
@@ -356,9 +461,90 @@
     };
   }
 
+  function getVisibleDirectChildren(container) {
+    return Array.from(container?.children || []).filter((child) => {
+      if (!(child instanceof Element) || child.id === ROOT_ID || child.id === SLOT_ID) {
+        return false;
+      }
+      const rect = child.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+  }
+
+  function findNaturalMiddleInsertionPoint(container) {
+    const children = getVisibleDirectChildren(container);
+    if (children.length === 0) {
+      return findTopInsertionPoint(container);
+    }
+
+    const overlayMetrics = getTopOverlayMetrics();
+    const safeTop = overlayMetrics.overlayBottom + 24;
+    const targetY = Math.max(safeTop + 120, window.innerHeight * 0.42);
+    let bestGap = null;
+
+    for (let index = 0; index < children.length - 1; index += 1) {
+      const currentRect = children[index].getBoundingClientRect();
+      const nextRect = children[index + 1].getBoundingClientRect();
+      const gap = nextRect.top - currentRect.bottom;
+      const gapCenter = currentRect.bottom + gap / 2;
+
+      if (gap < 20 || gapCenter < safeTop) {
+        continue;
+      }
+
+      const score = Math.abs(gapCenter - targetY) - Math.min(gap, 120) * 0.35;
+      if (!bestGap || score < bestGap.score) {
+        bestGap = {
+          before: children[index + 1],
+          score
+        };
+      }
+    }
+
+    if (bestGap) {
+      return { parent: container, before: bestGap.before };
+    }
+
+    const largeLeadBlock = children.find((child) => {
+      const rect = child.getBoundingClientRect();
+      return rect.top >= safeTop - 24 && rect.height > 220 && rect.width > container.getBoundingClientRect().width * 0.38;
+    });
+
+    if (largeLeadBlock?.nextSibling) {
+      return { parent: container, before: largeLeadBlock.nextSibling };
+    }
+
+    const fallbackIndex = Math.min(children.length - 1, Math.max(1, Math.floor(children.length * 0.33)));
+    return { parent: container, before: children[fallbackIndex] };
+  }
+
   function findTopInsertionPoint(container) {
     if (!container) {
       return { parent: document.body, before: document.body.firstChild };
+    }
+
+    const topOverlay = getTopOverlayMetrics();
+    const safeTop = topOverlay.overlayBottom + 16;
+    const directChildren = Array.from(container.children).filter((child) => child.id !== ROOT_ID && child.id !== SLOT_ID);
+
+    let lastOverlappingChild = null;
+    for (const child of directChildren) {
+      const rect = child.getBoundingClientRect();
+      if (rect.height <= 0 || rect.width <= 0) {
+        continue;
+      }
+
+      if (rect.top >= safeTop) {
+        return { parent: container, before: child };
+      }
+
+      if (rect.bottom > safeTop) {
+        lastOverlappingChild = child;
+      }
+    }
+
+    if (lastOverlappingChild) {
+      return { parent: container, before: lastOverlappingChild.nextSibling };
     }
 
     const preferredChild = container.querySelector(':scope > h1, :scope > header, :scope > .header, :scope > p, :scope > section, :scope > div');
@@ -434,11 +620,17 @@
     }
 
     if (placementSpec.position === 'middle' || placementSpec.position === 'center') {
-      const target = resolveAnchorTarget(primaryContainer, placementSpec);
-      if (target?.parentNode) {
-        target.insertAdjacentElement('afterend', slot);
-        return slot;
+      if (placementSpec.mode === 'anchor') {
+        const target = resolveAnchorTarget(primaryContainer, placementSpec);
+        if (target?.parentNode) {
+          target.insertAdjacentElement('afterend', slot);
+          return slot;
+        }
       }
+
+      const middleInsertion = findNaturalMiddleInsertionPoint(primaryContainer);
+      middleInsertion.parent.insertBefore(slot, middleInsertion.before || null);
+      return slot;
     }
 
     const insertion = findTopInsertionPoint(primaryContainer);
@@ -494,10 +686,6 @@
       root.dataset.layout = renderHints.layout || 'grid';
       root.dataset.chrome = renderHints.chrome || 'blend';
       root.dataset.emphasis = renderHints.emphasis || 'medium';
-      const subtitle = root.querySelector('.llamb-analysis-subtitle');
-      if (subtitle) {
-        subtitle.textContent = describePlacement(placementSpec);
-      }
       return root;
     }
 
@@ -510,39 +698,9 @@
     applyStyleProfile(root, styleProfile);
     root.innerHTML = `
       <div class="llamb-analysis-shell">
-        <div class="llamb-analysis-header">
-          <div>
-            <div class="llamb-analysis-eyebrow">LLaMb</div>
-            <div class="llamb-analysis-title">${DEFAULT_LABEL}</div>
-            <div class="llamb-analysis-subtitle">${escapeHtml(describePlacement(placementSpec))}</div>
-          </div>
-          <div class="llamb-analysis-actions">
-            <button class="llamb-analysis-btn" type="button" data-action="clear" aria-label="Clear current notes">Clear</button>
-            <button class="llamb-analysis-btn" type="button" data-action="close" aria-label="Hide current notes">Hide</button>
-          </div>
-        </div>
-        <div class="llamb-analysis-meta" id="llamb-analysis-meta"></div>
-        <div class="llamb-analysis-grid" id="llamb-analysis-grid"></div>
+        <div class="llamb-analysis-body" id="llamb-analysis-body"></div>
       </div>
     `;
-
-    root.addEventListener('click', (event) => {
-      const action = event.target?.dataset?.action;
-      if (action === 'close') {
-        cleanupMountedState();
-        root.remove();
-      }
-      if (action === 'clear') {
-        const grid = root.querySelector('#llamb-analysis-grid');
-        const meta = root.querySelector('#llamb-analysis-meta');
-        if (grid) {
-          grid.innerHTML = '';
-        }
-        if (meta) {
-          meta.textContent = '';
-        }
-      }
-    });
 
     mountRoot(root, placementSpec, { preserveExisting: false });
     observeRootPosition(root);
@@ -604,57 +762,55 @@
     const placementSpec = normalizePlacementSpec(placement);
     const normalizedHints = normalizeRenderHints(renderHints);
     const root = ensureRoot(normalizedHints, placementSpec);
-    const grid = root.querySelector('#llamb-analysis-grid');
-    const metaNode = root.querySelector('#llamb-analysis-meta');
+    const body = root.querySelector('#llamb-analysis-body');
+    const pageProfile = cachedPageProfile || getPageProfile();
+    const primaryContainer = pageProfile.stableContainer || findPrimaryContainer();
 
     applyRenderHints(root, normalizedHints);
     mountRoot(root, placementSpec, { preserveExisting: true });
 
-    grid.innerHTML = '';
-    metaNode.textContent = Object.keys(meta).length > 0
-      ? Object.entries(meta).map(([key, value]) => `${key}: ${value}`).join(' | ')
-      : '';
+    body.innerHTML = '';
 
     if (!Array.isArray(cards) || cards.length === 0) {
-      grid.innerHTML = `
-        <article class="llamb-analysis-card">
-          <h3>No Cards Returned</h3>
-          <div class="llamb-analysis-card-content">The analyzer finished, but no cards were returned.</div>
-        </article>
+      body.innerHTML = `
+        <div class="llamb-analysis-content">
+          <div class="llamb-analysis-card-header">
+            <h3>页面简介</h3>
+          </div>
+          <div class="llamb-analysis-card-content">当前没有可显示的页面简介。</div>
+        </div>
       `;
     } else {
-      cards.forEach((card, index) => {
-        const element = document.createElement('article');
-        element.className = 'llamb-analysis-card';
+      const card = cards[0];
+      const badge = card.type
+        ? `<span class="llamb-analysis-badge">${escapeHtml(card.type)}</span>`
+        : '';
+      const content = typeof card.content === 'string'
+        ? formatTextContent(card.content)
+        : `<pre>${escapeHtml(JSON.stringify(card.content ?? card, null, 2))}</pre>`;
+      const hostIcon = buildHostIconMarkup();
 
-        const badge = card.type
-          ? `<span class="llamb-analysis-badge">${escapeHtml(card.type)}</span>`
-          : '';
-
-        const content = typeof card.content === 'string'
-          ? formatTextContent(card.content)
-          : `<pre>${escapeHtml(JSON.stringify(card.content ?? card, null, 2))}</pre>`;
-
-        const items = Array.isArray(card.items) && card.items.length > 0
-          ? `<ul class="llamb-analysis-list">${card.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-          : '';
-
-        element.innerHTML = `
+      body.innerHTML = `
+        <div class="llamb-analysis-content">
           <div class="llamb-analysis-card-header">
-            <h3>${escapeHtml(card.title || `Card ${index + 1}`)}</h3>
+            <div class="llamb-analysis-title-wrap">
+              ${hostIcon}
+              <h3>${escapeHtml(card.title || '页面简介')}</h3>
+            </div>
             ${badge}
           </div>
           <div class="llamb-analysis-card-content">${content}</div>
-          ${items}
-        `;
-
-        grid.appendChild(element);
-      });
+        </div>
+      `;
     }
 
-    root.scrollIntoView({
-      behavior: 'smooth',
-      block: placementSpec.position === 'bottom' ? 'end' : 'center'
+    const overlayMetrics = getTopOverlayMetrics();
+    const rootRect = root.getBoundingClientRect();
+    const targetTop = window.scrollY + rootRect.top - overlayMetrics.overlayBottom - 24;
+
+    window.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: 'smooth'
     });
   }
 

@@ -92,7 +92,8 @@ async function analyzeTab(tabId) {
   });
 
   const settings = await getSettings();
-  const analysis = await getAnalysisCards(pageContext, settings.globalSettings || {});
+  const rawAnalysis = await getAnalysisCards(pageContext, settings.globalSettings || {});
+  const analysis = simplifyAnalysisForDisplay(rawAnalysis, pageContext);
 
     await chrome.tabs.sendMessage(tabId, {
       action: 'renderAnalysisCards',
@@ -209,49 +210,92 @@ function normalizeAnalysisPayload(payload) {
   throw new Error('Backend returned an invalid JSON payload');
 }
 
-function buildMockAnalysis(pageContext) {
-  const content = String(pageContext.markdownContent || '');
-  const selectedText = String(pageContext.selectedText || '').trim();
-  const isDynamicFeed = pageContext.pageSignals?.behavior?.pageType === 'dynamic-feed';
-  const words = content.split(/\s+/).filter(Boolean);
-  const paragraphCount = content.split(/\n{2,}/).map(part => part.trim()).filter(Boolean).length;
-  const readingEstimate = words.length > 0 ? Math.max(1, Math.round(words.length / 220)) : 0;
-
-  const cards = [
-    {
-      type: 'summary',
-      title: 'Mock Summary',
-      content: selectedText
-        ? `You selected part of "${pageContext.title}". This mock result shows how the final analysis cards will appear once your real backend is connected.`
-        : `This is a mock analysis card for "${pageContext.title}". The extension has already captured the page context and rendered the result at the top of the page.`
-    },
-    {
-      type: 'context',
-      title: 'Captured Context',
-      content: `Title: ${pageContext.title}\nURL: ${pageContext.url}\nSelected text: ${selectedText ? 'Yes' : 'No'}`
-    },
-    {
-      type: 'metrics',
-      title: 'Content Snapshot',
-      content: 'These numbers are generated locally from the captured page content.',
-      items: [
-        `Approx word count: ${words.length}`,
-        `Approx paragraph count: ${paragraphCount}`,
-        `Estimated reading time: ${readingEstimate} min`
-      ]
+function inferPageKind(pageContext) {
+  const hostname = (() => {
+    try {
+      return new URL(pageContext.url || '').hostname;
+    } catch {
+      return '';
     }
-  ];
+  })();
 
-  if (selectedText) {
-    cards.push({
-      type: 'selection',
-      title: 'Selected Text Preview',
-      content: selectedText.length > 260 ? `${selectedText.slice(0, 260)}...` : selectedText
-    });
+  if (pageContext.pageSignals?.behavior?.pageType === 'dynamic-feed') {
+    return 'feed';
   }
+  if (/video|bilibili|youtube|douyin/i.test(hostname)) {
+    return 'video';
+  }
+  if (/article|post|blog|news/i.test(pageContext.url || '')) {
+    return 'article';
+  }
+  return 'page';
+}
+
+function buildChineseIntro(pageContext, sourceCard) {
+  const title = String(pageContext.title || '').trim() || '当前页面';
+  const hostname = (() => {
+    try {
+      return new URL(pageContext.url || '').hostname.replace(/^www\./, '');
+    } catch {
+      return '当前网站';
+    }
+  })();
+  const pageKind = inferPageKind(pageContext);
+  const sourceText = String(sourceCard?.content || '').replace(/\s+/g, ' ').trim();
+  const shortSourceText = sourceText ? sourceText.split(/[。！？.!?]/)[0].trim() : '';
+
+  if (pageKind === 'feed') {
+    return `这是 ${hostname} 的推荐信息流页面，当前以可连续浏览的内容卡片为主，主题围绕“${title}”所在的推荐分区展开。`;
+  }
+  if (pageKind === 'video') {
+    return `这是 ${hostname} 上与“${title}”相关的视频内容页面，页面重点是视频封面、标题和互动信息的快速浏览。`;
+  }
+  if (pageKind === 'article') {
+    return `这是 ${hostname} 上的一篇图文内容页面，当前主题是“${title}”，适合继续向下阅读了解完整内容。`;
+  }
+  if (shortSourceText) {
+    return `这是 ${hostname} 上的“${title}”页面，主要内容可以概括为：${shortSourceText}。`;
+  }
+  return `这是 ${hostname} 上的“${title}”页面，当前页面主要围绕该主题展示相关内容与信息。`;
+}
+
+function simplifyAnalysisForDisplay(analysis, pageContext) {
+  const firstCard = Array.isArray(analysis.cards) && analysis.cards.length > 0
+    ? analysis.cards[0]
+    : null;
 
   return {
-    cards,
+    cards: [
+      {
+        type: '简介',
+        title: '页面简介',
+        content: buildChineseIntro(pageContext, firstCard),
+        items: []
+      }
+    ],
+    placement: analysis.placement || 'top',
+    renderHints: {
+      layout: 'minimal',
+      chrome: 'bordered',
+      emphasis: 'medium',
+      tone: '页面速览',
+      ...(analysis.renderHints || {})
+    },
+    meta: {}
+  };
+}
+
+function buildMockAnalysis(pageContext) {
+  const isDynamicFeed = pageContext.pageSignals?.behavior?.pageType === 'dynamic-feed';
+  return {
+    cards: [
+      {
+        type: '简介',
+        title: '页面简介',
+        content: buildChineseIntro(pageContext),
+        items: []
+      }
+    ],
     placement: isDynamicFeed
       ? {
           mode: 'anchor',
@@ -266,16 +310,11 @@ function buildMockAnalysis(pageContext) {
           label: 'near the opening content'
         },
     renderHints: {
-      layout: selectedText ? 'inline' : 'stack',
-      chrome: selectedText ? 'callout' : 'blend',
-      emphasis: selectedText ? 'high' : 'medium',
-      tone: selectedText ? 'Selected passage notes' : 'Page notes'
+      layout: 'minimal',
+      chrome: 'bordered',
+      emphasis: 'medium',
+      tone: '页面速览'
     },
-    meta: {
-      source: 'mock-data',
-      mode: 'local-fallback',
-      placement: 'anchor',
-      note: 'Set Use Mock Analysis to off and configure a backend endpoint when you are ready.'
-    }
+    meta: {}
   };
 }

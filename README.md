@@ -1,329 +1,343 @@
-# LLaMb Chrome Extension
+# LLaMb Page Analyzer
 
-`LLaMb Chrome Extension` 是一个基于 Chrome Manifest V3 的浏览器扩展，用来在任意网页侧边打开 AI 对话面板，并把当前页面的标题、URL、选中文本、页面内容以及插件提取到的附加信息一起发给大模型。
+`LLaMb Page Analyzer` 是一个基于 Chrome Manifest V3 的网页分析扩展。
 
-这个项目的核心目标不是做一个独立网页应用，而是把 AI 助手直接嵌入到浏览过程里，让你在阅读网页、看视频、查资料时，随时结合当前页面上下文进行提问、总结、解释和分析。
+它的目标不是打开一个独立面板，而是：
 
-## 项目能做什么
+- 读取当前网页的上下文
+- 将上下文发送到本地 mock 流程或后端 LLM
+- 在网页正文中插入一块尽量贴近原站风格的“页面简介”内容
 
-- 在任意网页注入聊天侧边栏
-- 自动采集当前网页上下文
-- 支持选中文本后直接结合选区提问
-- 支持多个 LLM 连接配置，并可切换当前激活模型
-- 支持流式输出
-- 保存聊天历史，并按会话恢复
-- 支持快捷动作，快速发起“总结页面”“解释选中文本”等固定提示
-- 支持插件机制，为特定网站提取额外内容
-- 当前内置 `YouTube Captions` 插件，可提取 YouTube 视频字幕作为上下文
+当前版本的重点是“自然融入网页本身”：
 
-## 如何运行
+- 自动识别页面结构
+- 自动选择较自然的插入位置
+- 自动避开顶部悬浮导航
+- 自动识别无限滚动 / 信息流页面
+- 自动采样宿主页面的字体、颜色、边框、圆角、阴影
+- 自动使用当前网站 `favicon` 作为简介标题前图标
+- 最终只显示一张中文简介卡，不再输出多张分析卡片
 
-这个项目是原生 Chrome 扩展项目，没有 `npm install`、没有打包脚本、也没有前端构建流程。运行方式就是直接以“开发者模式”加载源码目录。
+## 当前项目能做什么
 
-### 运行步骤
+### 1. 分析当前网页
 
-1. 打开 Chrome，进入 `chrome://extensions/`
-2. 打开右上角的“开发者模式”
-3. 点击“加载已解压的扩展程序”
-4. 选择当前项目根目录，也就是包含 [manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/manifest.json) 的目录
-5. 加载成功后，浏览器工具栏会出现扩展图标
+扩展会从当前标签页提取这些信息：
 
-### 首次使用前要做的事
-
-1. 点击扩展图标，打开弹窗界面
-2. 进入设置页，添加至少一个 LLM 连接
-3. 填写模型接口地址、模型名和 API Key
-4. 将某个连接设为激活状态
-5. 返回任意网页，点击扩展图标或右键菜单，打开侧边栏开始聊天
-
-## 如何使用
-
-### 1. 打开侧边栏
-
-有几种入口：
-
-- 点击浏览器工具栏中的扩展图标
-- 使用右键菜单中的 `Toggle Chat Sidebar`
-- 由弹窗中的按钮触发
-
-侧边栏支持两种显示方式：
-
-- 贴边侧栏模式
-- 浮动窗口模式
-
-浮动窗口的位置和尺寸会被记录，下次打开时会恢复。
-
-### 2. 结合当前网页聊天
-
-在网页中打开侧边栏后，发送消息时扩展会自动整理当前页面信息，通常包括：
-
-- 页面标题
 - 页面 URL
-- 当前选中文本
-- 页面提取出的正文内容
-- 插件提取到的附加内容，例如 YouTube 字幕
+- 页面标题
+- 用户当前选中的文本
+- 主内容文本
+- 页面结构锚点
+- 页面样式信号
+- 页面行为信号，例如是否是动态信息流页面
 
-这些内容会被拼成系统上下文，再和你的问题一起发送给当前激活的 LLM。
+这些信息由 [content.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 收集。
 
-### 3. 使用快捷动作
+### 2. 在网页中插入原生感更强的简介模块
 
-项目内置了一组快捷动作，例如：
+扩展不会弹出一个独立聊天窗口，而是直接修改真实网页 DOM，将一块简介内容插入到页面流中。
 
-- 总结当前页面
-- 解释当前选中文本
-- 概述页面主题
-- 提炼关键信息
+当前插入块具备这些特征：
 
-快捷动作本质上是带变量占位符的 Prompt 模板，会自动填入页面标题、URL、正文和选区内容，然后直接把请求发到侧边栏里。
+- 真实 DOM 节点插入，不是截图或浮层假 UI
+- 使用网页自己的颜色、字体和板块风格
+- 使用网站 `favicon` 作为标题前图标
+- 默认只显示一张“页面简介”
+- 内容为中文简短介绍
 
-### 4. 管理连接
+### 3. 自动决定更自然的插入位置
 
-设置页支持：
+当前项目不再只依赖固定的“顶部插入”，而是加入了本地布局判断：
 
-- 新增连接
-- 编辑连接
-- 删除连接
-- 测试连接
-- 设为当前激活连接
-- 配置是否启用流式输出、推理能力等特性
+- 识别顶部 `fixed/sticky` 导航，避免插入后被导航遮住
+- 避免插到页面视觉最底部
+- 对动态信息流页面优先尝试中部白区或稳定锚点
+- 对普通页面优先选择正文流中更自然的位置
 
-连接信息保存在本地 `chrome.storage.local` 中。
+这部分逻辑同样位于 [content.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js)。
 
-### 5. 管理插件
+### 4. 支持本地 mock 与后端 LLM 两种模式
 
-目前项目内置一个插件：
+项目支持两种分析来源：
 
-- `YouTube Captions`
+- `mock` 模式：本地直接生成简介内容，便于快速调试
+- `backend` 模式：将页面上下文发往后端，再由后端调用 LLM 返回结果
 
-启用后，当你访问 YouTube 视频页面时，插件会尝试提取字幕内容，并把它作为额外上下文提供给聊天系统。这样你可以直接基于视频字幕提问、总结和分析。
+后端接口由 [background.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js) 调用，示例服务在 [backend-example/server.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/server.js)。
 
-## 这个项目是怎么运作的
+## 项目当前的工作流
 
-整个扩展可以理解成 4 层：
+整个流程可以概括为：
 
-1. 页面层：采集上下文并渲染聊天 UI
-2. 后台层：统一处理消息、管理 LLM 请求、转发流式响应
-3. 配置层：管理连接、设置、快捷动作和会话数据
-4. 插件层：为特定网站补充额外内容
+1. 用户点击扩展弹窗中的 `Analyze Current Page`
+2. [background.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js) 确保内容脚本已经注入
+3. [content.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 收集页面上下文与页面结构信号
+4. `background.js` 根据设置选择：
+   - 本地 `mock`
+   - 后端接口
+5. 如果使用后端：
+   - 扩展将 `pageContext` 发送到你的后端
+   - 后端再调用 LLM
+6. 后端返回结构化结果后，前端会进一步收缩成一张“页面简介”
+7. [content.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 根据页面布局和样式将其插入网页中
 
-### 页面层：`content.js`
-
-[content.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 是注入到网页中的主内容脚本，负责：
-
-- 创建和销毁侧边栏 UI
-- 管理侧边栏显示状态
-- 支持浮动窗口拖拽和缩放
-- 读取用户选区和页面内容
-- 加载聊天历史并渲染消息
-- 接收后台返回的流式内容并实时更新界面
-- 协调插件，把插件提取的内容加入页面上下文
-
-当用户在侧边栏里发送消息时，`content.js` 会先调用本地的页面上下文提取逻辑，再通过 `chrome.runtime.sendMessage` 把消息发给后台。
-
-### 后台层：`background.js`
-
-[background.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js) 是扩展的 Service Worker，负责：
-
-- 在安装和启动时初始化管理器
-- 创建右键菜单
-- 处理来自内容脚本、弹窗和设置页的消息
-- 管理和调用 LLM
-- 把流式输出按块转发回页面
-- 提供聊天历史、连接列表、插件列表等后台能力
-
-你可以把它理解成整个扩展的调度中心。
-
-### 配置与数据层：`js/`
-
-`js/` 目录下是扩展的核心逻辑模块。
-
-#### [js/storage-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/storage-manager.js)
-
-负责统一管理设置数据，包括：
-
-- LLM 连接
-- 当前激活连接
-- 全局设置
-- 快捷动作
-- 侧边栏显示状态
-- 当前激活会话
-
-#### [js/chat-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/chat-manager.js)
-
-负责聊天持久化，包括：
-
-- 创建会话
-- 保存消息
-- 维护聊天标题
-- 查询历史记录
-- 删除会话
-- 导出 Markdown
-
-#### [js/llm-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-manager.js)
-
-这是 LLM 调度核心，负责：
-
-- 获取当前激活连接
-- 构造消息数组
-- 把页面上下文包装成系统提示
-- 调用具体 Provider
-- 处理流式和非流式响应
-- 在多个连接之间做失败回退
-
-#### [js/llm-providers.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-providers.js)
-
-负责适配不同模型服务接口。当前代码主要覆盖：
-
-- OpenAI
-- OpenAI Compatible
-- Anthropic
-
-每个 Provider 会根据不同平台的 API 规范组装请求。
-
-#### [js/stream-parser.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/stream-parser.js)
-
-负责解析流式返回的数据块，把 SSE 或完整响应整理成可用于 UI 渲染的内容片段。
-
-#### [js/plugin-base.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/plugin-base.js)
-
-定义插件统一接口和公共能力，是所有插件的基类。
-
-#### [js/plugin-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/plugin-manager.js)
-
-负责：
-
-- 注册插件
-- 启用或停用插件
-- 给插件分配受控 API
-- 在页面变化时通知插件
-- 从插件取回内容并作为上下文注入聊天
-
-### 弹窗层：`popup.html` / `popup.js`
-
-[popup.html](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.html) 和 [popup.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.js) 是点击扩展图标后看到的界面，主要承担轻量操作入口：
-
-- 切换侧边栏
-- 查看和切换连接
-- 执行快捷动作
-- 查看插件状态
-- 跳转到设置页
-
-适合日常快速使用。
-
-### 设置页：`settings.html` / `settings.js`
-
-[settings.html](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.html) 和 [settings.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.js) 是完整配置页，主要用于：
-
-- 管理 LLM 连接
-- 编辑全局设置
-- 开关流式输出
-- 导入和导出设置
-- 管理插件启用状态
-
-适合做完整配置和维护。
-
-### 插件层：`plugins/`
-
-当前插件目录里已有一个内置插件：
-
-- [plugins/youtube-captions/plugin.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/plugins/youtube-captions/plugin.js)
-- [plugins/youtube-captions/manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/plugins/youtube-captions/manifest.json)
-
-它的作用是在 YouTube 视频页中提取字幕，并把结果暴露给侧边栏作为额外上下文。
-
-## 一次完整请求的执行流程
-
-下面是一条消息从输入到返回的大致路径：
-
-1. 用户在网页中打开侧边栏并输入问题
-2. [content.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js) 提取页面标题、URL、选区、页面正文和插件内容
-3. 内容脚本把消息发给 [background.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js)
-4. 后台调用 [js/llm-manager.js](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/llm-manager.js)
-5. `LLMManager` 根据当前激活连接选择对应 Provider
-6. Provider 请求外部模型 API
-7. 如果是流式响应，后台会把每个数据块持续转发回内容脚本
-8. 内容脚本实时更新侧边栏消息 UI
-9. 聊天记录由 `ChatManager` 持久化保存
-
-## 项目结构
+## 当前项目结构
 
 ```text
 LLaMbChromeExt/
-+-- manifest.json               # Chrome 扩展入口配置
-+-- background.js              # 后台 Service Worker
-+-- content.js                 # 页面侧边栏与上下文采集主逻辑
-+-- popup.html                 # 扩展弹窗页面
-+-- popup.js                   # 弹窗交互逻辑
-+-- settings.html              # 设置页面
-+-- settings.js                # 设置页逻辑
-+-- sidebar.css                # 页面侧边栏样式
-+-- llamb-ui.css               # popup / settings 通用 UI 样式
-+-- js/
-    +-- storage-manager.js     # 设置、连接、快捷动作、状态存储
-    +-- chat-manager.js        # 聊天历史管理
-    +-- llm-manager.js         # LLM 请求编排
-    +-- llm-providers.js       # 多 Provider 适配
-    +-- stream-parser.js       # 流式结果解析
-    +-- plugin-base.js         # 插件基类
-    +-- plugin-manager.js      # 插件管理器
-    +-- debug-logger.js        # 调试日志控制
-+-- plugins/
-    +-- youtube-captions/
-        +-- manifest.json      # 插件元信息
-        +-- plugin.js          # YouTube 字幕提取插件
-+-- icons/                     # 扩展图标资源
-+-- DESIGN_SYSTEM.md           # 界面设计说明
-+-- PLUGIN_DEVELOPMENT.md      # 插件开发文档
+|-- manifest.json
+|-- background.js
+|-- content.js
+|-- sidebar.css
+|-- popup.html
+|-- popup.js
+|-- settings.html
+|-- settings.js
+|-- BACKEND_API.md
+|-- CODEBASE_GUIDE.md
+|-- DESIGN_SYSTEM.md
+|-- backend-example/
+|   |-- server.js
+|   |-- llmClient.js
+|   |-- promptBuilder.js
+|   |-- responseValidator.js
+|   `-- README.md
+|-- js/
+|   `-- storage-manager.js
+|-- icons/
+`-- plugins/
 ```
 
-## 支持的配置与能力
+## 关键文件说明
 
-### 连接配置
+### [manifest.json](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/manifest.json)
 
-连接对象通常包含：
+扩展入口配置文件。
 
-- 连接名称
-- Provider 类型
-- Endpoint
-- API Key
-- 模型名
-- 是否启用
-- 优先级
-- 是否支持流式输出
+当前主要声明了：
 
-### 全局设置
+- 权限：`activeTab`、`storage`、`scripting`、`contextMenus`、`tabs`
+- 内容脚本：`content.js`
+- 注入样式：`sidebar.css`
+- 后台 Service Worker：`background.js`
+- 扩展图标与弹窗
 
-当前代码中可见的全局设置包括：
+### [background.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js)
 
-- 主题
-- 自动采集上下文
-- 流式输出开关
-- 是否展示 thinking blocks
-- 最大 token 数
-- temperature
-- 调试日志开关
+后台调度中心。
 
-## 适合继续扩展的方向
+负责：
 
-这个项目已经具备继续演进的基础，比较容易扩展的方向有：
+- 创建右键菜单
+- 响应弹窗操作
+- 注入内容脚本和样式
+- 从页面拿 `pageContext`
+- 请求 mock 或后端分析
+- 统一把分析结果收敛为一张中文简介卡
+- 将结果回传给页面进行渲染
 
-- 增加更多模型 Provider
-- 增加更多站点插件
-- 改进页面正文抽取质量
-- 增强快捷动作模板系统
-- 完善聊天导出与导入
-- 为插件增加更完整的设置界面
+### [content.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/content.js)
+
+当前项目最核心的文件。
+
+负责：
+
+- 提取页面内容
+- 识别页面是否为动态 feed / 无限滚动页面
+- 识别页面顶部悬浮导航
+- 识别更自然的中段插入位置
+- 采样宿主页面样式
+- 选择和插入真实 DOM
+- 保持插入节点跟随占位符，避免被宿主页脚本挪走
+- 获取网站 favicon 并展示在简介标题旁
+
+### [sidebar.css](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/sidebar.css)
+
+虽然文件名还是 `sidebar.css`，但当前用途已经不是旧侧边栏样式，而是页面内简介模块的样式定义。
+
+它现在负责：
+
+- 让插入块尽量贴近宿主页样式
+- 保持只有一个外层框
+- 控制 favicon、标题、正文排版
+- 维持较弱侵入感的视觉表现
+
+### [popup.html](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.html) / [popup.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/popup.js)
+
+扩展图标对应的弹窗入口。
+
+当前功能很简单：
+
+- 分析当前页面
+- 打开设置页
+
+### [settings.html](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.html) / [settings.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/settings.js)
+
+设置页用于管理全局配置。
+
+当前主要配置项有：
+
+- `Backend Analysis Endpoint`
+- `Backend Auth Token`
+- `Use Mock Analysis`
+
+### [js/storage-manager.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/storage-manager.js)
+
+用于读取和写入扩展设置，底层存储在 `chrome.storage.local`。
+
+## 页面插入策略
+
+当前项目的插入策略已经不是“盲目插顶部”，而是混合了几类本地判断：
+
+### 1. 顶部导航避让
+
+如果页面顶部存在可见的 `fixed` / `sticky` 导航，扩展会：
+
+- 估算这层覆盖区的高度
+- 避开这部分区域
+- 调整最终滚动定位，防止简介被导航压住
+
+### 2. 动态信息流识别
+
+如果页面表现得像推荐流、视频流、瀑布流，扩展会：
+
+- 标记为 `dynamic-feed`
+- 避开不断增长的 feed 容器
+- 尝试把内容放到更自然的中间白区或稳定锚点附近
+
+### 3. 中间白区插入
+
+在适合的页面中，扩展会优先寻找：
+
+- 大块内容之后的自然空隙
+- 中部白色留白区域
+- 不容易被宿主页遮挡的位置
+
+### 4. 占位符锁定
+
+为了防止宿主页在滚动中重排 DOM 后把插入块“挤走”，当前实现使用了占位符机制：
+
+- 首次插入时先放一个 slot
+- 真正的内容始终跟着这个 slot
+- 如果宿主页脚本挪动节点，扩展会尝试把内容拉回 slot 后面
+
+## 页面风格融合策略
+
+当前版本已经做了这些“仿站感”处理：
+
+- 读取宿主页面的字体
+- 读取正文和标题颜色
+- 读取按钮或链接的强调色
+- 读取页面板块的背景色
+- 读取边框颜色
+- 读取圆角和阴影
+- 使用网站 favicon 作为标题图标
+
+因此它不是完全使用固定设计系统，而是尽量贴近当前页面板块。
+
+## 后端模式
+
+如果关闭 `Use Mock Analysis`，扩展会调用后端接口。
+
+请求入口格式见：
+
+- [BACKEND_API.md](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/BACKEND_API.md)
+
+示例后端位于：
+
+- [backend-example/server.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/server.js)
+- [backend-example/llmClient.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/llmClient.js)
+- [backend-example/promptBuilder.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/promptBuilder.js)
+- [backend-example/responseValidator.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/responseValidator.js)
+
+当前后端示例支持：
+
+- OpenAI 兼容接口
+- 严格 JSON schema 返回
+- 页面结构与样式信号输入
+- 单张中文简介卡输出
+
+## 如何运行
+
+### 方式一：直接使用 mock 模式
+
+适合先看注入效果。
+
+1. 打开 Chrome
+2. 进入 `chrome://extensions/`
+3. 打开右上角“开发者模式”
+4. 点击“加载已解压的扩展程序”
+5. 选择当前项目目录
+6. 打开扩展设置页
+7. 勾选 `Use Mock Analysis`
+8. 打开任意网页
+9. 点击扩展弹窗里的 `Analyze Current Page`
+
+### 方式二：连接本地后端
+
+1. 进入 [backend-example](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example)
+2. 安装依赖并配置 `.env`
+3. 启动本地后端
+4. 在扩展设置页填写：
+   - `Backend Analysis Endpoint`
+   - `Backend Auth Token`（如有）
+5. 关闭 `Use Mock Analysis`
+6. 打开网页并执行分析
+
+## 当前设置项
+
+目前从代码可见的全局设置只有三项：
+
+- `backendEndpoint`
+- `backendAuthToken`
+- `useMockAnalysis`
+
+默认值定义在 [background.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/background.js) 与 [js/storage-manager.js](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/js/storage-manager.js)。
+
+## 当前项目的真实边界
+
+这个 README 也明确说明当前项目“已经能做什么”和“还不能做什么”。
+
+### 已经做到的
+
+- 修改真实网页 DOM
+- 插入真实文本与属性
+- 改变页面中的真实布局位置
+- 根据页面视觉风格做一定程度的融合
+- 使用网站 favicon 增强原生感
+- 自动识别部分动态信息流页面
+- 避让顶部悬浮导航
+
+### 还没有做到的
+
+- 不能直接访问浏览器地址栏 UI
+- 不能直接读取浏览器工具栏图标
+- 不能保证对所有网站都完美融入
+- 还没有为每个站点做专门适配
+- 还没有把宿主页现成组件完整克隆成自己的模块
+
+## 适合继续演进的方向
+
+如果你要继续把项目做成“更像页面原生模块”的研究型原型，接下来比较值得做的是：
+
+- 站点级适配规则，例如 B 站、学校首页、新闻站
+- 更强的中部白区检测
+- 识别双栏布局与轮播区后的自然插槽
+- 更细的 favicon 选择规则，例如优先 16x16 / 32x32
+- 复用宿主页已有胶囊标签、按钮和小图形组件
+- 更稳的动态 DOM 重排恢复逻辑
 
 ## 开发提示
 
-- 修改源码后，需要回到 `chrome://extensions/` 点击刷新扩展
-- 内容脚本调试看网页 DevTools
-- 后台逻辑调试看扩展的 Service Worker 控制台
-- Popup 调试可以右键扩展弹窗进行检查
-- 设置页就是普通扩展页面，可直接打开 DevTools
+- 修改扩展代码后，需要回到 `chrome://extensions/` 点击刷新
+- 页面侧逻辑请在网页 DevTools 中调试
+- 后台逻辑请在扩展 Service Worker 面板中调试
+- 如果页面样式没有更新，通常需要刷新目标网页
 
-## 备注
+## 相关文档
 
-- 本项目当前是本地配置模式，敏感信息保存在浏览器扩展存储中
-- 连接测试逻辑默认会请求你配置的接口地址，确保接口支持对应 API 格式
-- 插件加载方式受 Manifest V3 CSP 限制，新插件需要在 [manifest.json](c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/manifest.json) 中预先声明相关脚本资源
+- [BACKEND_API.md](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/BACKEND_API.md)
+- [backend-example/README.md](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/backend-example/README.md)
+- [CODEBASE_GUIDE.md](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/CODEBASE_GUIDE.md)
+- [DESIGN_SYSTEM.md](/c:/Users/wang/Desktop/毕设/code/LLaMbChromeExt/code/LLaMbChromeExt/DESIGN_SYSTEM.md)
