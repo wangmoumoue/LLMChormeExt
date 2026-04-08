@@ -73,6 +73,23 @@
   background: transparent;
 }
 
+#llamb-analysis-root[data-host-mimic="true"] .llamb-analysis-shell {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  backdrop-filter: none;
+}
+
+#llamb-analysis-root[data-host-mimic="true"] .llamb-analysis-shell::before {
+  display: none;
+}
+
+#llamb-analysis-root .llamb-analysis-mimic-body {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+}
+
 #llamb-analysis-root[data-chrome="ghost"] .llamb-analysis-shell {
   background: transparent;
   box-shadow: none;
@@ -94,6 +111,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  min-width: 0;
+}
+
+#llamb-analysis-root .llamb-analysis-title-block {
   min-width: 0;
 }
 
@@ -124,6 +145,15 @@
   min-width: 0;
 }
 
+#llamb-analysis-root .llamb-analysis-subtitle {
+  margin-top: 0.2rem;
+  color: color-mix(in srgb, var(--llamb-muted-color, currentColor) 84%, transparent);
+  font-size: 0.8em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 #llamb-analysis-root .llamb-analysis-badge {
   flex-shrink: 0;
   border-radius: 999px;
@@ -140,6 +170,58 @@
   color: inherit;
   word-break: break-word;
   line-height: 1.7;
+}
+
+#llamb-analysis-root[data-render-mode="banner"] .llamb-analysis-shell {
+  padding-block: 0.8rem;
+}
+
+#llamb-analysis-root[data-render-mode="banner"] .llamb-analysis-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+#llamb-analysis-root[data-render-mode="banner"] .llamb-analysis-card-header {
+  margin-bottom: 0.15rem;
+}
+
+#llamb-analysis-root[data-render-mode="inline-block"] {
+  max-width: min(720px, 100%);
+}
+
+#llamb-analysis-root[data-render-mode="inline-block"] .llamb-analysis-shell {
+  background: color-mix(in srgb, var(--llamb-surface-color, #fff) 92%, var(--llamb-accent-color, currentColor) 8%);
+}
+
+#llamb-analysis-root[data-render-mode="compact-tip"] {
+  max-width: min(540px, 100%);
+}
+
+#llamb-analysis-root[data-render-mode="compact-tip"] .llamb-analysis-shell {
+  padding: 0.75rem 0.85rem;
+  border-style: dashed;
+}
+
+#llamb-analysis-root[data-chrome="callout"] .llamb-analysis-shell {
+  background: color-mix(in srgb, var(--llamb-surface-color, #fff) 88%, var(--llamb-accent-color, currentColor) 12%);
+}
+
+#llamb-analysis-root[data-variant="landing-page"] .llamb-analysis-shell::before {
+  width: 100%;
+  height: 3px;
+  inset: 0 0 auto 0;
+}
+
+#llamb-analysis-root[data-variant="doc-page"] .llamb-analysis-card-content {
+  font-size: 0.98em;
+}
+
+#llamb-analysis-root[data-page-type="generic"] .llamb-analysis-meta {
+  display: inline-flex;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+  flex-wrap: wrap;
 }
 
 #llamb-analysis-root .llamb-analysis-card-content br + br {

@@ -153,8 +153,8 @@ async function callChatCompletions(messages, attempt) {
   }
 }
 
-async function analyzePageContext(pageContext) {
-  const messages = buildMessages(pageContext);
+async function analyzePageContext(analysisInput) {
+  const messages = buildMessages(analysisInput);
   let lastError;
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {

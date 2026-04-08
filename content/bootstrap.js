@@ -5,77 +5,14 @@
     return;
   }
   window.__llambPageAnalyzerLoaded = true;
+  const runtime = globalThis.__LLAMB_CONTENT__;
 
   const ROOT_ID = 'llamb-analysis-root';
   const DEFAULT_LABEL = 'LLaMb page notes';
   const ANCHOR_ATTR = 'data-llamb-anchor-id';
   const SLOT_ID = 'llamb-analysis-slot';
-  const PAGE_TYPES = ['article', 'feed', 'form', 'product', 'dashboard', 'video', 'generic'];
-  const PAGE_TYPE_KEYWORDS = {
-    article: ['article', 'news', 'blog', 'post', 'story'],
-    form: ['login', 'sign', 'register', 'search', 'submit', 'signup'],
-    product: ['product', 'item', 'shop', 'sku', 'buy', 'detail'],
-    dashboard: ['dashboard', 'admin', 'console', 'panel', 'workspace'],
-    video: ['video', 'watch', 'play', 'player']
-  };
-  const STRATEGY_MAP = {
-    article: {
-      strategyId: 'article-inline-summary',
-      placementMode: 'after-paragraph',
-      renderMode: 'card',
-      contentGoal: 'summary',
-      riskLevel: 'low',
-      explanation: ['pageType is article']
-    },
-    feed: {
-      strategyId: 'feed-midstream-card',
-      placementMode: 'between-cards',
-      renderMode: 'card',
-      contentGoal: 'context-note',
-      riskLevel: 'medium',
-      explanation: ['pageType is feed']
-    },
-    form: {
-      strategyId: 'form-context-help',
-      placementMode: 'near-form',
-      renderMode: 'compact-tip',
-      contentGoal: 'guide',
-      riskLevel: 'low',
-      explanation: ['pageType is form']
-    },
-    product: {
-      strategyId: 'product-side-note',
-      placementMode: 'after-heading',
-      renderMode: 'inline-block',
-      contentGoal: 'highlight',
-      riskLevel: 'low',
-      explanation: ['pageType is product']
-    },
-    dashboard: {
-      strategyId: 'dashboard-compact-panel',
-      placementMode: 'side-panel',
-      renderMode: 'banner',
-      contentGoal: 'context-note',
-      riskLevel: 'medium',
-      explanation: ['pageType is dashboard']
-    },
-    video: {
-      strategyId: 'video-context-card',
-      placementMode: 'after-heading',
-      renderMode: 'card',
-      contentGoal: 'context-note',
-      riskLevel: 'low',
-      explanation: ['pageType is video']
-    },
-    generic: {
-      strategyId: 'generic-fallback-card',
-      placementMode: 'fallback',
-      renderMode: 'card',
-      contentGoal: 'summary',
-      riskLevel: 'low',
-      explanation: ['fallback generic strategy']
-    }
-  };
+  const PAGE_TYPES = runtime.constants.PAGE_TYPES;
+  const PAGE_TYPE_KEYWORDS = runtime.constants.PAGE_TYPE_KEYWORDS;
   let rootObserver = null;
   let cachedPageProfile = null;
 
@@ -976,70 +913,23 @@
   }
 
   function selectInjectionStrategy(pageType, pageContext, domFeatures) {
-    const base = STRATEGY_MAP[pageType] || STRATEGY_MAP.generic;
-    const genericProfile = deriveGenericPageProfile(pageContext, domFeatures);
-    const explanation = [...base.explanation];
-    const strategy = { ...base };
-
-    if (pageType === 'article' && domFeatures.textLength > 2800) {
-      explanation.push('long text body detected');
-    }
-    if (pageType === 'feed' && pageContext.behaviorSignals?.pageType === 'dynamic-feed') {
-      explanation.push('dynamic feed requires stable mid-stream placement');
-    }
-    if (pageType === 'form' && domFeatures.hasSearchBox) {
-      explanation.push('search-like form needs contextual tip');
-    }
-    if (pageType === 'dashboard' && domFeatures.sidebarExists) {
-      explanation.push('sidebar layout suggests compact panel');
-    }
-    if (pageType === 'generic' && genericProfile.isSimplePage) {
-      strategy.placementMode = 'after-heading';
-      strategy.renderMode = genericProfile.variant === 'landing-page' ? 'banner' : 'inline-block';
-      strategy.contentGoal = genericProfile.variant === 'doc-page' ? 'summary' : 'context-note';
-      explanation.push(...genericProfile.reasons);
-      explanation.push('generic: using simple-page adaptive strategy');
-    }
-
+    const strategyModule = runtime.modules.getStrategyModule(pageType);
     return {
-      ...strategy,
-      explanation
+      pageType,
+      ...(strategyModule?.getStrategy(pageContext, domFeatures) || {
+      strategyId: 'generic-fallback-card',
+      placementMode: 'fallback',
+      renderMode: 'card',
+      contentGoal: 'summary',
+      riskLevel: 'low',
+      explanation: ['fallback generic strategy']
+      })
     };
   }
 
   function buildFallbackBody(pageType, pageContext) {
-    const title = String(pageContext.title || '').trim() || '当前页面';
-    const hostname = (() => {
-      try {
-        return new URL(pageContext.url || '').hostname.replace(/^www\./, '');
-      } catch {
-        return '当前网站';
-      }
-    })();
-
-    if (pageType === 'form') {
-      return `这是 ${hostname} 上与“${title}”相关的表单页面，当前更适合结合页面字段说明和提交流程来理解内容。`;
-    }
-    if (pageType === 'feed') {
-      return `这是 ${hostname} 上的内容流页面，当前以连续卡片和推荐内容为主，适合快速了解本页主题与浏览路径。`;
-    }
-    if (pageType === 'product') {
-      return `这是 ${hostname} 上与“${title}”相关的详情展示页面，当前页面重点通常在商品信息、价格和操作区。`;
-    }
-    if (pageType === 'dashboard') {
-      return `这是 ${hostname} 上的控制台或数据面板页面，页面主要由模块化信息区、统计区或表格区组成。`;
-    }
-    if (pageType === 'video') {
-      return `这是 ${hostname} 上与“${title}”相关的视频页面，当前页面通常围绕播放器、简介和推荐内容展开。`;
-    }
-    if (pageType === 'article') {
-      return `这是 ${hostname} 上的一篇图文页面，当前主题是“${title}”，适合按正文结构继续向下阅读。`;
-    }
-    const leadSentence = getLeadSentence(pageContext.mainContent || pageContext.markdownContent || '');
-    if (leadSentence) {
-      return `这是 ${hostname} 上的“${title}”页面，页面当前的核心内容可以概括为：${leadSentence}`;
-    }
-    return `这是 ${hostname} 上的“${title}”页面，当前展示的主要是与该主题相关的页面内容与结构信息。`;
+    const strategyModule = runtime.modules.getStrategyModule(pageType);
+    return strategyModule?.buildFallbackBody(pageContext) || '';
   }
 
   function buildInjectionPayload(input) {
@@ -1080,7 +970,7 @@
       },
       metadata: {
         pageType: pageType || 'generic',
-        strategyId: strategy?.strategyId || STRATEGY_MAP.generic.strategyId
+        strategyId: strategy?.strategyId || 'generic-fallback-card'
       }
     };
   }
@@ -1098,88 +988,22 @@
   function resolvePlacement(strategy, pageContext, domFeatures) {
     const pageProfile = cachedPageProfile || getPageProfile();
     const primaryContainer = pageProfile.stableContainer || findPrimaryContainer();
-    const paragraphs = Array.from(primaryContainer.querySelectorAll('p')).filter((element) =>
-      normalizeWhitespace(element.textContent || '').length > 80
-    );
-    const headings = Array.from(primaryContainer.querySelectorAll('h1, h2, h3'));
-    const formPlacementContext = findFormPlacementContext();
-    const genericProfile = deriveGenericPageProfile(pageContext, domFeatures);
-    const useStableFeedPlacement = shouldUseStableFeedPlacement(pageContext, domFeatures);
     const preferredViewportRatio = strategy?.strategyId === 'feed-midstream-card' ? 0.58 : 0.72;
     const visualSafeAnchor = findVisualSafeAnchor(primaryContainer, pageProfile, preferredViewportRatio);
-    let anchorElement = null;
-    let insertMode = 'after';
-    let confidence = 0.45;
-    let debugReason = 'fallback to generic insertion';
-
-    switch (strategy?.strategyId) {
-      case 'article-inline-summary':
-        anchorElement = paragraphs[1] || paragraphs[0] || headings[0] || primaryContainer.firstElementChild;
-        insertMode = 'after';
-        confidence = anchorElement ? 0.86 : 0.42;
-        debugReason = anchorElement ? 'article paragraph/heading anchor found' : 'article anchor missing, using fallback';
-        break;
-      case 'feed-midstream-card':
-        if (useStableFeedPlacement) {
-          anchorElement =
-            findStableTopAnchor(pageProfile, primaryContainer) ||
-            headings[0] ||
-            pageProfile.feedContainer?.previousElementSibling ||
-            primaryContainer.firstElementChild ||
-            primaryContainer;
-          insertMode = anchorElement === primaryContainer ? 'prepend' : 'after';
-          confidence = anchorElement ? 0.91 : 0.4;
-          debugReason = anchorElement
-            ? 'dynamic/infinite feed uses stable top anchor outside growing stream'
-            : 'dynamic feed stable anchor missing, using fallback';
-        } else {
-          anchorElement =
-            (pageProfile.feedContainer && getVisibleDirectChildren(pageProfile.feedContainer)[2]) ||
-            getVisibleDirectChildren(primaryContainer)[2] ||
-            headings[0];
-          insertMode = 'after';
-          confidence = anchorElement ? 0.79 : 0.4;
-          debugReason = anchorElement ? 'feed card anchor found near stable mid-stream position' : 'feed anchor missing, using fallback';
-        }
-        break;
-      case 'form-context-help':
-        anchorElement =
-          formPlacementContext?.fieldAnchor ||
-          findFirstMatching(['form h1', 'form h2', 'form', 'button[type="submit"]', 'input[type="submit"]']) ||
-          headings[0];
-        insertMode = 'before';
-        confidence = anchorElement ? 0.93 : 0.43;
-        debugReason = anchorElement
-          ? 'form help anchored directly above the first form field block'
-          : 'form anchor missing, using fallback';
-        break;
-      case 'product-side-note':
-        anchorElement = findFirstMatching(['h1', '[itemprop="price"]', '[class*="price"]', '[class*="buy"]']) || headings[0];
-        insertMode = 'after';
-        confidence = anchorElement ? 0.76 : 0.4;
-        debugReason = anchorElement ? 'product title/price area found' : 'product anchor missing, using fallback';
-        break;
-      case 'dashboard-compact-panel':
-        anchorElement = findFirstMatching(['main', '[role="main"]', '[class*="dashboard"]', '[class*="content"]']) || primaryContainer;
-        insertMode = 'prepend';
-        confidence = anchorElement ? 0.74 : 0.42;
-        debugReason = anchorElement ? 'dashboard main container found' : 'dashboard anchor missing, using fallback';
-        break;
-      case 'video-context-card':
-        anchorElement = findFirstMatching(['video', '[class*="player"]', '[id*="player"]', 'h1']) || headings[0];
-        insertMode = anchorElement?.matches?.('video') ? 'after' : 'after';
-        confidence = anchorElement ? 0.8 : 0.41;
-        debugReason = anchorElement ? 'video player/heading area found' : 'video anchor missing, using fallback';
-        break;
-      default:
-        anchorElement = headings[0] || paragraphs[0] || primaryContainer.firstElementChild || primaryContainer;
-        insertMode = genericProfile.isSimplePage ? 'after' : 'prepend';
-        confidence = anchorElement ? 0.72 : 0.36;
-        debugReason = genericProfile.isSimplePage
-          ? 'generic simple page uses heading/lead paragraph anchor'
-          : 'generic page falls back to primary content container';
-        break;
-    }
+    const strategyModule = runtime.modules.getStrategyModule(strategy?.pageType || 'generic');
+    const rawPlacement = strategyModule?.resolvePlacement({
+      strategy,
+      pageContext,
+      domFeatures,
+      pageProfile,
+      primaryContainer
+    }) || {
+      anchorElement: primaryContainer.firstElementChild || primaryContainer,
+      insertMode: 'prepend',
+      confidence: 0.35,
+      debugReason: 'no strategy placement matched, using primary container'
+    };
+    let { anchorElement, insertMode, confidence, debugReason } = rawPlacement;
 
     if (!(anchorElement instanceof Element)) {
       return {
@@ -1192,7 +1016,7 @@
       };
     }
 
-    if (strategy?.strategyId !== 'form-context-help' && !isElementInPreferredVisualZone(anchorElement, preferredViewportRatio)) {
+    if (!rawPlacement.skipVisualAdjustment && !isElementInPreferredVisualZone(anchorElement, preferredViewportRatio)) {
       anchorElement = visualSafeAnchor;
       insertMode = anchorElement === primaryContainer ? 'prepend' : 'after';
       confidence = Math.min(confidence, 0.7);
@@ -1205,14 +1029,14 @@
           mode: 'flow',
           position: insertMode === 'append' ? 'middle' : 'top',
           label: debugReason,
-          lockMode: useStableFeedPlacement && strategy?.strategyId === 'feed-midstream-card' ? 'stable-anchor' : ''
+          lockMode: rawPlacement.lockMode || ''
         }
       : {
           mode: 'anchor',
           position: insertMode === 'before' ? 'before' : 'after',
           anchorId,
           label: debugReason,
-          lockMode: useStableFeedPlacement && strategy?.strategyId === 'feed-midstream-card' ? 'stable-anchor' : ''
+          lockMode: rawPlacement.lockMode || ''
         };
 
     return {
@@ -1777,6 +1601,14 @@
     return snapshot;
   }
 
+  function getHostnameLabel(url) {
+    try {
+      return new URL(url || '').hostname.replace(/^www\./, '');
+    } catch {
+      return '当前网站';
+    }
+  }
+
   async function collectAdaptiveContext() {
     const pageContext = await getPageContext();
     const domFeatures = extractDomFeatures();
@@ -1814,6 +1646,24 @@
       strategy
     };
   }
+
+  runtime.helpers = {
+    ...runtime.helpers,
+    normalizeWhitespace,
+    truncateText,
+    safeRatio,
+    countMatches,
+    getLeadSentence,
+    deriveGenericPageProfile,
+    shouldUseStableFeedPlacement,
+    getVisibleDirectChildren,
+    findStableTopAnchor,
+    findVisualSafeAnchor,
+    isElementInPreferredVisualZone,
+    findFormPlacementContext,
+    findFirstMatching,
+    getHostnameLabel
+  };
 
   function renderAdaptiveInjection(input = {}) {
     const pageContext = input.pageContext || {};

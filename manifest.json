@@ -16,13 +16,32 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": [
+        "content/shared/namespace.js",
+        "content/shared/constants.js",
+        "content/strategies/page-types/form/login.js",
+        "content/strategies/page-types/form/register.js",
+        "content/strategies/page-types/form/search.js",
+        "content/strategies/page-types/form/survey.js",
+        "content/strategies/page-types/form/default.js",
+        "content/strategies/page-types/feed/bilibili-home.js",
+        "content/strategies/page-types/feed/video-site-home.js",
+        "content/strategies/page-types/feed/generic-feed.js",
+        "content/strategies/page-types/article.js",
+        "content/strategies/page-types/feed.js",
+        "content/strategies/page-types/form.js",
+        "content/strategies/page-types/product.js",
+        "content/strategies/page-types/dashboard.js",
+        "content/strategies/page-types/video.js",
+        "content/strategies/page-types/generic.js",
+        "content/bootstrap.js"
+      ],
       "css": ["sidebar.css"],
       "run_at": "document_idle"
     }
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/bootstrap.js"
   },
   "action": {
     "default_title": "LLaMb Page Analyzer",

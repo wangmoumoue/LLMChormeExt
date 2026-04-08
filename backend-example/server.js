@@ -30,7 +30,13 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/analyze-page', async (req, res) => {
-  const pageContext = req.body?.pageContext;
+  const analysisInput = {
+    pageContext: req.body?.pageContext,
+    domFeatures: req.body?.domFeatures,
+    classification: req.body?.classification,
+    strategy: req.body?.strategy
+  };
+  const pageContext = analysisInput.pageContext;
 
   if (!pageContext || typeof pageContext !== 'object') {
     return res.status(400).json({
@@ -43,7 +49,7 @@ app.post('/api/analyze-page', async (req, res) => {
 
   try {
     const startedAt = Date.now();
-    const result = await analyzePageContext(pageContext);
+    const result = await analyzePageContext(analysisInput);
     const latencyMs = Date.now() - startedAt;
 
     return res.json({
@@ -52,6 +58,8 @@ app.post('/api/analyze-page', async (req, res) => {
       renderHints: result.renderHints || {},
       meta: {
         ...result.meta,
+        pageType: analysisInput.classification?.pageType || 'generic',
+        strategyId: analysisInput.strategy?.strategyId || '',
         source: 'llm-backend',
         route: '/api/analyze-page',
         latencyMs

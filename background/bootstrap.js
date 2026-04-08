@@ -1,12 +1,12 @@
-const SETTINGS_KEY = 'llamb-settings';
-const DEFAULT_SETTINGS = {
-  globalSettings: {
-    backendEndpoint: '',
-    backendAuthToken: '',
-    useMockAnalysis: true,
-    debugLogging: false
-  }
-};
+importScripts(
+  'modules/runtime.js',
+  'modules/settings.js',
+  'modules/analysis-service.js'
+);
+
+const BACKGROUND_RUNTIME = globalThis.__LLAMB_BACKGROUND__;
+const SETTINGS_KEY = BACKGROUND_RUNTIME.constants.SETTINGS_KEY;
+const DEFAULT_SETTINGS = BACKGROUND_RUNTIME.constants.DEFAULT_SETTINGS;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
@@ -138,7 +138,26 @@ async function ensureContentScript(tabId) {
 
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ['content.js']
+      files: [
+        'content/shared/namespace.js',
+        'content/shared/constants.js',
+        'content/strategies/page-types/form/login.js',
+        'content/strategies/page-types/form/register.js',
+        'content/strategies/page-types/form/search.js',
+        'content/strategies/page-types/form/survey.js',
+        'content/strategies/page-types/form/default.js',
+        'content/strategies/page-types/feed/bilibili-home.js',
+        'content/strategies/page-types/feed/video-site-home.js',
+        'content/strategies/page-types/feed/generic-feed.js',
+        'content/strategies/page-types/article.js',
+        'content/strategies/page-types/feed.js',
+        'content/strategies/page-types/form.js',
+        'content/strategies/page-types/product.js',
+        'content/strategies/page-types/dashboard.js',
+        'content/strategies/page-types/video.js',
+        'content/strategies/page-types/generic.js',
+        'content/bootstrap.js'
+      ]
     });
   }
 }

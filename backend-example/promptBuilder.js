@@ -1,3 +1,6 @@
+﻿const { verifyOrInferPageType } = require('./pageClassifier');
+const { buildStrategyPromptHints } = require('./strategyPlanner');
+
 const ANALYSIS_RESPONSE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -83,42 +86,47 @@ function truncateText(text, maxLength) {
   return `${normalized.slice(0, maxLength)}...`;
 }
 
-function buildMessages(pageContext) {
+function buildMessages(input = {}) {
+  const pageContext = input.pageContext || {};
+  const classification = verifyOrInferPageType(input);
+  const strategyHints = buildStrategyPromptHints(input.strategy, classification.pageType);
+
   const systemPrompt = [
     'You are a webpage analysis engine.',
     'You must return valid JSON only.',
     'Do not include markdown fences.',
     'Do not include explanations outside JSON.',
     'Follow the response schema exactly.',
-    'You may choose where the inserted block should appear so it feels native to the page.',
+    `The current pageType is "${classification.pageType}".`,
+    `The current strategyId is "${strategyHints.strategyId}".`,
+    `The content goal is "${strategyHints.contentGoal}".`,
+    `Preferred render mode is "${strategyHints.renderMode}".`,
+    'Use placement and renderHints so the injected block feels native to the page.',
     'Do not place the inserted block at the visual bottom of the page.',
     'Prefer an anchor-based placement when the page structure suggests a natural insertion point.',
-    'If pageContext.pageSignals.behavior.pageType is "dynamic-feed", avoid the feed stream and prefer a stable anchor near the top.',
-    'If pageContext.pageSignals.behavior.preferredPlacement is "middle", prefer a natural white-space gap in the middle content area.',
     'When using anchor placement, choose an anchorId from pageContext.pageSignals.structure.anchors.',
-    'Use renderHints to make the injected content feel like part of the host page rather than a floating widget.',
-    'Because the response schema is strict, every field in placement objects and renderHints must always be present.',
-    'When a field does not apply, set it to null instead of omitting it.',
-    'Return exactly 1 card.',
-    'The card must be written in simple Chinese.',
-    'The card should briefly introduce what the current page is about.',
-    'Each card must be concise and readable inside a browser page.',
-    'Each card must always include an "items" field. Use an empty array if there are no bullet items.',
-    'Do not output a "meta" field. The server will add metadata after validation.',
-    'Use a simple title such as "页面简介".',
-    'Prefer a simple intro card instead of multiple analysis sections.',
-    'Do not generate raw CSS, HTML, or JS.',
-    'Design through placement and renderHints only.',
+    'Return exactly 1 card in simple Chinese.',
+    'The card should briefly introduce what the current page is about, matching the pageType and strategy goal.',
+    'For article pages, prefer a concise summary tone.',
+    'For form pages, prefer guiding or clarifying language.',
+    'For feed and video pages, prefer context-setting language.',
+    'For dashboard and product pages, prefer structured and informative language.',
+    'Each card must always include an items field. Use an empty array if there are no bullet items.',
+    'Do not output raw HTML, CSS, or JS.',
     `Response JSON schema: ${JSON.stringify(ANALYSIS_RESPONSE_SCHEMA)}`
   ].join(' ');
 
   const userPayload = {
     task: 'Analyze this webpage context and return JSON that follows the schema exactly.',
+    pageType: classification.pageType,
+    strategy: strategyHints,
+    classification,
+    domFeatures: input.domFeatures || {},
     pageContext: {
       url: pageContext.url || '',
       title: pageContext.title || '',
       selectedText: truncateText(pageContext.selectedText || '', 1500),
-      markdownContent: truncateText(pageContext.markdownContent || '', 12000),
+      mainContent: truncateText(pageContext.mainContent || pageContext.markdownContent || '', 12000),
       pluginContent: truncateText(pageContext.pluginContent || '', 4000),
       pageSignals: pageContext.pageSignals || {},
       timestamp: pageContext.timestamp || ''
