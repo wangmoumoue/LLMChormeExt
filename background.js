@@ -98,7 +98,8 @@ async function analyzeTab(tabId) {
       action: 'renderAnalysisCards',
       cards: analysis.cards,
       meta: analysis.meta || {},
-      placement: analysis.placement || 'top'
+      placement: analysis.placement || 'top',
+      renderHints: analysis.renderHints || {}
     });
 
   return analysis;
@@ -176,14 +177,15 @@ async function requestBackendAnalysis(pageContext, globalSettings) {
 
 function normalizeAnalysisPayload(payload) {
   if (Array.isArray(payload)) {
-    return { cards: payload, meta: {}, placement: 'top' };
+    return { cards: payload, meta: {}, placement: 'top', renderHints: {} };
   }
 
   if (payload?.cards && Array.isArray(payload.cards)) {
     return {
       cards: payload.cards,
       meta: payload.meta || {},
-      placement: payload.placement || 'top'
+      placement: payload.placement || 'top',
+      renderHints: payload.renderHints || {}
     };
   }
 
@@ -199,7 +201,8 @@ function normalizeAnalysisPayload(payload) {
         }
       ],
       meta: payload.meta || {},
-      placement: payload.placement || 'top'
+      placement: payload.placement || 'top',
+      renderHints: payload.renderHints || {}
     };
   }
 
@@ -209,6 +212,7 @@ function normalizeAnalysisPayload(payload) {
 function buildMockAnalysis(pageContext) {
   const content = String(pageContext.markdownContent || '');
   const selectedText = String(pageContext.selectedText || '').trim();
+  const isDynamicFeed = pageContext.pageSignals?.behavior?.pageType === 'dynamic-feed';
   const words = content.split(/\s+/).filter(Boolean);
   const paragraphCount = content.split(/\n{2,}/).map(part => part.trim()).filter(Boolean).length;
   const readingEstimate = words.length > 0 ? Math.max(1, Math.round(words.length / 220)) : 0;
@@ -248,11 +252,29 @@ function buildMockAnalysis(pageContext) {
 
   return {
     cards,
-    placement: 'top',
+    placement: isDynamicFeed
+      ? {
+          mode: 'anchor',
+          position: 'after',
+          anchorId: 'anchor-1',
+          label: 'after a stable page header'
+        }
+      : {
+          mode: 'anchor',
+          position: 'after',
+          anchorId: 'anchor-2',
+          label: 'near the opening content'
+        },
+    renderHints: {
+      layout: selectedText ? 'inline' : 'stack',
+      chrome: selectedText ? 'callout' : 'blend',
+      emphasis: selectedText ? 'high' : 'medium',
+      tone: selectedText ? 'Selected passage notes' : 'Page notes'
+    },
     meta: {
       source: 'mock-data',
       mode: 'local-fallback',
-      placement: 'top',
+      placement: 'anchor',
       note: 'Set Use Mock Analysis to off and configure a backend endpoint when you are ready.'
     }
   };

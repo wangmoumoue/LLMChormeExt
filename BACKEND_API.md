@@ -36,6 +36,24 @@ The extension sends this payload:
     "title": "Example Article",
     "selectedText": "Optional selected text",
     "markdownContent": "# Page content in markdown-like form",
+    "pageSignals": {
+      "hostStyle": {
+        "fontFamily": "\"Helvetica Neue\", Arial, sans-serif",
+        "textColor": "rgb(34, 34, 34)"
+      },
+      "structure": {
+        "primaryTag": "article",
+        "anchorCount": 4,
+        "anchors": [
+          {
+            "anchorId": "anchor-1",
+            "role": "title",
+            "tagName": "h1",
+            "label": "Example Article"
+          }
+        ]
+      }
+    },
     "pluginContent": "Optional plugin extracted content",
     "timestamp": "2026-04-07T09:00:00.000Z"
   }
@@ -58,7 +76,18 @@ Recommended shape:
 
 ```json
 {
-  "placement": "top",
+  "placement": {
+    "mode": "anchor",
+    "position": "after",
+    "anchorId": "anchor-2",
+    "label": "after the opening paragraph"
+  },
+  "renderHints": {
+    "layout": "inline",
+    "chrome": "blend",
+    "emphasis": "medium",
+    "tone": "Article notes"
+  },
   "cards": [
     {
       "type": "summary",
@@ -86,13 +115,15 @@ Recommended shape:
 
 ## Response Field Notes
 
-- `placement`: where the extension should insert cards, currently `top` or `bottom`
+- `placement`: can be `top`, or an object telling the extension to place content near a returned anchor
+- `renderHints`: model-chosen layout and chrome hints that the extension maps into safe native-looking styles
 - `cards`: array rendered by the extension
 - `cards[].type`: optional category badge
 - `cards[].title`: required for best display
 - `cards[].content`: primary card content, usually markdown/plain text
 - `cards[].items`: optional list rendered under the card
 - `meta`: optional flat object displayed above cards
+- `pageContext.pageSignals`: front-end extracted structure and style hints for the model
 
 ## Accepted Fallback Shapes
 

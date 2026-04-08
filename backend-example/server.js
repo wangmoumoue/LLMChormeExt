@@ -49,6 +49,7 @@ app.post('/api/analyze-page', async (req, res) => {
     return res.json({
       placement: result.placement,
       cards: result.cards,
+      renderHints: result.renderHints || {},
       meta: {
         ...result.meta,
         source: 'llm-backend',
