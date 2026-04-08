@@ -2,558 +2,160 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>LlamB Settings - Connection Management</title>
-    <link rel="stylesheet" href="llamb-ui.css">
+    <title>LLaMb Analyzer Settings</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            min-height: 100vh;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
-        .settings-container {
+        .shell {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 32px 20px 48px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 800;
+        }
+
+        .header p {
+            margin: 10px 0 0;
+            color: #64748b;
+            line-height: 1.7;
+        }
+
+        .card {
+            margin-top: 24px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        input[type="url"],
+        input[type="password"] {
             width: 100%;
-            margin: 0;
-            padding: var(--llamb-spacing-xl);
+            padding: 12px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 14px;
             box-sizing: border-box;
-        }
-        
-        @media (max-width: 768px) {
-            .settings-container {
-                padding: var(--llamb-spacing-md);
-            }
-            
-            .form-2col {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .connection-list {
-            display: grid;
-            gap: var(--llamb-spacing-lg);
-        }
-
-        .connection-card {
-            background: var(--llamb-bg-secondary);
-            border: 1px solid var(--llamb-border);
-            border-radius: var(--llamb-radius-lg);
-            padding: var(--llamb-spacing-xl);
-            position: relative;
-            transition: all var(--llamb-transition-standard);
-        }
-
-        .connection-card:hover {
-            transform: translateY(-1px);
-        }
-
-        .connection-card.active {
-            border-color: var(--llamb-user-bubble);
-            background: var(--llamb-bg-primary);
-        }
-
-        .connection-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: var(--llamb-spacing-md);
-        }
-
-        .connection-name {
-            font-size: var(--llamb-font-size-lg);
-            font-weight: var(--llamb-font-weight-semibold);
-            color: var(--llamb-text-primary);
-            margin: 0;
-        }
-
-        .connection-details {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: var(--llamb-spacing-sm) var(--llamb-spacing-lg);
-            font-size: var(--llamb-font-size-sm);
-            color: var(--llamb-text-secondary);
-            margin-bottom: var(--llamb-spacing-lg);
-        }
-
-        .connection-actions {
-            display: flex;
-            gap: var(--llamb-spacing-sm);
-        }
-
-        .btn-danger {
-            color: #ea4335;
-            border-color: #ea4335;
-        }
-
-        .btn-danger:hover {
-            background: #fce8e6;
-        }
-
-        .form-2col {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--llamb-spacing-lg);
-        }
-
-        .form-full-width {
-            grid-column: 1 / -1;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: var(--llamb-spacing-sm);
-            margin-top: var(--llamb-spacing-sm);
         }
 
         .checkbox {
-            width: 16px;
-            height: 16px;
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
             display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s;
-        }
-
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .modal {
-            background: var(--llamb-bg-primary);
-            border-radius: var(--llamb-radius-xl);
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow: auto;
-            border: 1px solid var(--llamb-border);
-            transform: translateY(20px);
-            transition: all 0.3s;
-        }
-
-        .modal-overlay.active .modal {
-            transform: translateY(0);
-        }
-
-        .modal-header {
-            padding: var(--llamb-spacing-xl) var(--llamb-spacing-xl) 0 var(--llamb-spacing-xl);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-size: var(--llamb-font-size-xl);
-            font-weight: var(--llamb-font-weight-semibold);
-            color: var(--llamb-text-primary);
-            margin: 0;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: var(--llamb-text-secondary);
-            cursor: pointer;
-            padding: 4px;
-        }
-
-        .modal-content {
-            padding: var(--llamb-spacing-xl);
-        }
-
-        .modal-footer {
-            padding: 0 var(--llamb-spacing-xl) var(--llamb-spacing-xl) var(--llamb-spacing-xl);
-            display: flex;
-            justify-content: flex-end;
-            gap: var(--llamb-spacing-md);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: calc(var(--llamb-spacing-xl) * 2) var(--llamb-spacing-xl);
-            color: var(--llamb-text-secondary);
-        }
-
-        .empty-state .icon {
-            font-size: 48px;
-            margin-bottom: var(--llamb-spacing-lg);
-        }
-
-        .toast {
-            position: fixed;
-            top: var(--llamb-spacing-xl);
-            right: var(--llamb-spacing-xl);
-            background: var(--llamb-user-bubble);
-            color: var(--llamb-user-text);
-            padding: var(--llamb-spacing-md) var(--llamb-spacing-xl);
-            border-radius: var(--llamb-radius-md);
-            z-index: 2000;
-            transform: translateX(100%);
-            transition: all 0.3s;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.success { background: #34a853; color: white; }
-        .toast.error { background: #ea4335; color: white; }
-
-        .plugin-list {
-            display: grid;
-            gap: var(--llamb-spacing-lg);
-        }
-
-        .plugin-card {
-            background: var(--llamb-bg-secondary);
-            border: 1px solid var(--llamb-border);
-            border-radius: var(--llamb-radius-lg);
-            padding: var(--llamb-spacing-xl);
-            position: relative;
-            transition: all var(--llamb-transition-standard);
-        }
-
-        .plugin-card:hover {
-            transform: translateY(-1px);
-        }
-
-        .plugin-card.disabled {
-            opacity: 0.6;
-        }
-
-        .plugin-header {
-            display: flex;
-            justify-content: space-between;
+            gap: 10px;
             align-items: flex-start;
-            margin-bottom: var(--llamb-spacing-md);
         }
 
-        .plugin-info {
-            flex: 1;
+        .checkbox input {
+            margin-top: 3px;
         }
 
-        .plugin-name {
-            font-size: var(--llamb-font-size-lg);
-            font-weight: var(--llamb-font-weight-semibold);
-            color: var(--llamb-text-primary);
-            margin: 0 0 var(--llamb-spacing-xs) 0;
+        .help {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .actions {
             display: flex;
-            align-items: center;
-            gap: var(--llamb-spacing-sm);
+            gap: 12px;
+            margin-top: 24px;
         }
 
-        .plugin-icon {
-            font-size: 20px;
-        }
-
-        .plugin-description {
-            font-size: var(--llamb-font-size-sm);
-            color: var(--llamb-text-secondary);
-            margin: 0;
-        }
-
-        .plugin-toggle {
-            margin-left: var(--llamb-spacing-md);
-        }
-
-        .plugin-details {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: var(--llamb-spacing-sm) var(--llamb-spacing-lg);
-            font-size: var(--llamb-font-size-sm);
-            color: var(--llamb-text-secondary);
-            margin-bottom: var(--llamb-spacing-lg);
-        }
-
-        .plugin-matches {
-            grid-column: 1 / -1;
-            font-size: var(--llamb-font-size-xs);
-            color: var(--llamb-text-secondary);
-            background: var(--llamb-bg-primary);
-            padding: var(--llamb-spacing-sm);
-            border-radius: var(--llamb-radius-sm);
-            margin-top: var(--llamb-spacing-sm);
-        }
-
-        .plugin-matches strong {
-            display: block;
-            margin-bottom: var(--llamb-spacing-xs);
-        }
-
-        .plugin-matches ul {
-            margin: 0;
-            padding-left: var(--llamb-spacing-md);
-            list-style-type: disc;
-        }
-
-        .plugin-matches li {
-            font-family: monospace;
-            font-size: var(--llamb-font-size-xs);
-        }
-
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
+        button {
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 700;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 24px;
         }
 
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
+        .primary {
+            background: #2563eb;
+            color: #ffffff;
         }
 
-        input:checked + .toggle-slider {
-            background-color: var(--llamb-user-bubble);
+        .secondary {
+            background: #e2e8f0;
+            color: #0f172a;
         }
 
-        input:checked + .toggle-slider:before {
-            transform: translateX(20px);
-        }
-
-        .toggle-slider.round {
-            border-radius: 24px;
-        }
-
-        .toggle-slider.round:before {
-            border-radius: 50%;
-        }
-
-        @media (max-width: 768px) {
-            .form-2col {
-                grid-template-columns: 1fr;
-            }
-            
-            .settings-container {
-                padding: var(--llamb-spacing-lg);
-            }
-            
-            .modal {
-                width: 95%;
-            }
+        .status {
+            margin-top: 14px;
+            min-height: 20px;
+            font-size: 13px;
+            color: #0f766e;
         }
     </style>
 </head>
-<body class="llamb-root">
-    <div class="llamb-header">
-        <div class="llamb-header-title">
-            <span>🦙</span>
-            <div>
-                <div>LlamB Settings</div>
-                <div class="llamb-text-secondary llamb-text-sm">Manage your LLM connections and preferences</div>
+<body>
+    <div class="shell">
+        <div class="header">
+            <h1>LLaMb Analyzer Settings</h1>
+            <p>
+                This stripped-down version keeps only one flow: collect page context, analyze it, and insert result cards at the top of the page.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="field">
+                <label for="backend-endpoint">Backend Analysis Endpoint</label>
+                <input type="url" id="backend-endpoint" placeholder="http://localhost:3000/api/analyze-page">
+                <div class="help">
+                    Default local development endpoint for the Express mock backend.
+                </div>
             </div>
+
+            <div class="field">
+                <label for="backend-auth-token">Backend Auth Token</label>
+                <input type="password" id="backend-auth-token" placeholder="Optional Bearer token">
+            </div>
+
+            <div class="field checkbox">
+                <input type="checkbox" id="use-mock-analysis">
+                <div>
+                    <label for="use-mock-analysis" style="margin-bottom: 4px;">Use Mock Analysis</label>
+                    <div class="help">
+                        When enabled, the extension skips the backend and generates demo cards locally. For the required minimal closed loop, keep this off and run the local Express backend.
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="primary" id="save-settings-btn">Save Settings</button>
+                <button class="secondary" id="reset-settings-btn">Reset to Default</button>
+            </div>
+
+            <div class="status" id="status"></div>
         </div>
     </div>
 
-    <div class="settings-container">
-        <!-- Connections Section -->
-        <div class="llamb-section">
-            <div class="llamb-section-header">
-                <div class="llamb-section-title">LLM Connections</div>
-                <button class="llamb-btn llamb-btn-primary" id="add-connection-btn">
-                    ➕ Add Connection
-                </button>
-            </div>
-            <div id="connections-container">
-                <div class="empty-state" id="empty-state">
-                    <div class="icon">🔗</div>
-                    <h3>No connections configured</h3>
-                    <p>Add your first LLM connection to get started</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Global Settings Section -->
-        <div class="llamb-section">
-            <div class="llamb-section-title">Global Settings</div>
-            <div class="form-2col">
-                <div class="llamb-form-group">
-                    <label class="llamb-label">Theme</label>
-                    <select class="llamb-input llamb-select" id="theme-select">
-                        <option value="auto">Auto (System)</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                    </select>
-                </div>
-                <div class="llamb-form-group">
-                    <label class="llamb-label">Max Tokens</label>
-                    <input type="number" class="llamb-input" id="max-tokens" min="100" max="32000" value="4000">
-                </div>
-                <div class="llamb-form-group">
-                    <label class="llamb-label">Temperature</label>
-                    <input type="number" class="llamb-input" id="temperature" min="0" max="2" step="0.1" value="0.7">
-                </div>
-                <div class="llamb-form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" class="checkbox" id="auto-context">
-                        <label for="auto-context">Auto capture page context</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" class="checkbox" id="streaming-enabled">
-                        <label for="streaming-enabled">Enable streaming responses</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" class="checkbox" id="show-thinking">
-                        <label for="show-thinking">Show thinking/reasoning blocks</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" class="checkbox" id="debug-logging">
-                        <label for="debug-logging">Enable debug logging (console)</label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Plugin Management Section -->
-        <div class="llamb-section">
-            <div class="llamb-section-title">Plugin Management</div>
-            <div id="plugins-container">
-                <div class="empty-state" id="plugins-empty-state" style="display: none;">
-                    <div class="icon">🧩</div>
-                    <h3>No plugins available</h3>
-                    <p>No plugins are registered in the system</p>
-                </div>
-                <div id="plugins-list"></div>
-            </div>
-        </div>
-
-        <!-- Import/Export Section -->
-        <div class="llamb-section">
-            <div class="llamb-section-title">Backup & Restore</div>
-            <div class="llamb-flex" style="gap: var(--llamb-spacing-lg);">
-                <button class="llamb-btn" id="export-settings-btn">📤 Export Settings</button>
-                <button class="llamb-btn" id="import-settings-btn">📥 Import Settings</button>
-                <input type="file" id="import-file-input" accept=".json" style="display: none;">
-            </div>
-        </div>
-    </div>
-
-    <!-- Connection Modal -->
-    <div class="modal-overlay" id="connection-modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title" id="modal-title">Add Connection</h3>
-                <button class="modal-close" id="modal-close-btn">×</button>
-            </div>
-            <div class="modal-content">
-                <form id="connection-form">
-                    <div class="form-2col">
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">Connection Name</label>
-                            <input type="text" class="llamb-input" id="connection-name" required>
-                        </div>
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">Type</label>
-                            <select class="llamb-input llamb-select" id="connection-type" required>
-                                <option value="openai-compatible">OpenAI Compatible</option>
-                                <option value="openai">OpenAI</option>
-                                <option value="anthropic">Anthropic (Coming Soon)</option>
-                            </select>
-                        </div>
-                        <div class="llamb-form-group form-full-width">
-                            <label class="llamb-label">Endpoint URL</label>
-                            <input type="url" class="llamb-input" id="connection-endpoint" required 
-                                   placeholder="http://localhost:11434/v1 or https://api.openai.com/v1">
-                        </div>
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">API Key (Optional)</label>
-                            <input type="password" class="llamb-input" id="connection-api-key" 
-                                   placeholder="Leave empty for local models">
-                        </div>
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">Model</label>
-                            <div class="llamb-flex" style="gap: var(--llamb-spacing-sm);">
-                                <select class="llamb-input llamb-select" id="connection-model-select" style="flex: 1;">
-                                    <option value="">Select a model...</option>
-                                </select>
-                                <button type="button" class="llamb-btn" id="fetch-models-btn" style="white-space: nowrap;">
-                                    🔄 Fetch Models
-                                </button>
-                            </div>
-                            <input type="text" class="llamb-input" id="connection-model-input" 
-                                   placeholder="Or type custom model name..." style="margin-top: var(--llamb-spacing-sm);">
-                        </div>
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">Context Window</label>
-                            <input type="number" class="llamb-input" id="context-window" min="1024" max="1000000" value="4096">
-                        </div>
-                        <div class="llamb-form-group">
-                            <label class="llamb-label">Timeout (ms)</label>
-                            <input type="number" class="llamb-input" id="connection-timeout" min="5000" max="300000" value="30000">
-                        </div>
-                        <div class="llamb-form-group form-full-width">
-                            <div class="checkbox-group">
-                                <input type="checkbox" class="checkbox" id="feature-streaming" checked>
-                                <label for="feature-streaming">Streaming Support</label>
-                            </div>
-                            <div class="checkbox-group">
-                                <input type="checkbox" class="checkbox" id="feature-reasoning">
-                                <label for="feature-reasoning">Reasoning Blocks</label>
-                            </div>
-                            <div class="checkbox-group">
-                                <input type="checkbox" class="checkbox" id="feature-thinking">
-                                <label for="feature-thinking">Thinking Blocks</label>
-                            </div>
-                            <div class="checkbox-group">
-                                <input type="checkbox" class="checkbox" id="connection-enabled" checked>
-                                <label for="connection-enabled">Enabled</label>
-                            </div>
-                        </div>
-                        <div class="llamb-form-group form-full-width">
-                            <label class="llamb-label">Custom Headers (JSON)</label>
-                            <textarea class="llamb-input" id="custom-headers" 
-                                      placeholder='{"Custom-Header": "value"}' style="min-height: 80px; resize: vertical;"></textarea>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="llamb-btn" id="test-connection-btn">🧪 Test Connection</button>
-                <button type="button" class="llamb-btn" id="cancel-btn">Cancel</button>
-                <button type="submit" class="llamb-btn llamb-btn-primary" form="connection-form" id="save-connection-btn">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Scripts -->
     <script src="js/storage-manager.js"></script>
     <script src="settings.js"></script>
 </body>
